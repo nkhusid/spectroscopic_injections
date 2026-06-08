@@ -56,7 +56,7 @@ def plot_mfcf_man(df, mf_true, cf_true, ax, legend=True, **ckws):
 
 ##### mode amplitude evolution #####
 def get_projection(df, mode, t0ref):
-    t = np.arange(-12, 16, 3)
+    t = np.arange(-15, 16, 3)
 
     TM = m * rd.qnms.T_MSUN
     tref = (t - t0ref) * TM

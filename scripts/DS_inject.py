@@ -109,7 +109,7 @@ def main():
     wd = temp_fit.whiten(temp_fit.analysis_data)
     cumsnr = {i: np.sqrt(np.cumsum(d*d)) for i, d in wd.items()}
     ppSNR = float(np.linalg.norm([cs.iloc[-1] for cs in cumsnr.values()]))
-    snr_scale = ppSNR / args.snr
+    snr_scale = ppSNR / float(args.snr)
     print(ppSNR)
     print(snr_scale)
 
