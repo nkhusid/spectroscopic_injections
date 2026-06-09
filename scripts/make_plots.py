@@ -5,6 +5,7 @@ from matplotlib.lines import Line2D
 filled = list(Line2D.filled_markers)
 
 import argparse
+import copy
 
 import ringdown as rd
 
@@ -51,6 +52,7 @@ def main():
 
         mchi_figpath = savedir / f'mchi_summary{group}.pdf'
         amps_figpath = savedir / f'amps_summary{group}.pdf'
+        comp_figpath = savedir / f'comp_summary{group}.pdf'
 
         ### FOR NON-TGR RUNS ###
         if 'tgr' not in grouped_subdirs:
@@ -63,6 +65,7 @@ def main():
                 combo = subdir.split('_')[0]
                 try:
                     coll = rd.ResultCollection.from_netcdf(str(resdir / subdir / 'engine' / '*' / 'result.nc'))
+                    # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
                     colls[combo] = coll
                     df = coll.get_parameter_dataframe(ndraw=500, prng=13)
                     df['run'] = round((df['run'] - t0) / TM)
@@ -129,6 +132,41 @@ def main():
                 leg = ax[0].legend(handles=legend_handles, loc=(0.47, 0.52), frameon=False, ncol=2, fontsize=13)
                 
                 plt.savefig(str(amps_figpath), bbox_inches='tight')
+
+            ### LOO SUMMARY PLOT ###
+            if (not comp_figpath.exists()) or (args.suffix is not False):
+                print('Making LOO comparison plot...')
+
+                loo_colls = copy.deepcopy(colls)
+
+                for combo, coll in loo_colls.items():
+                    coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
+
+                loo_dict = pd.DataFrame({combo: [r.idx[s].loo.elpd_loo for s in dfs[combo]['run'].unique()] for combo, r in loo_colls.items()}, index=np.array(dfs[list(dfs.keys())[0]]['run'].unique()))
+
+                model_dfs = []
+                for s in loo_dict.index:
+                    model_df = az.compare({k: r.idx[s] for k, r in loo_colls.items()}, ic='loo', var_name='whitened_pointwise_loglike')
+                    model_df['$t_> = t - t_{\\mathrm{peak}}$ [$t_{M_f}$]'] = s
+                    model_dfs.append(model_df)
+
+                comp_df = pd.concat(model_dfs, ignore_index=False)
+                comp_df['model'] = comp_df.index
+                comp_df['elpd_diff_doub'] = comp_df['elpd_diff'] * 2
+                comp_df['dse_doub'] = comp_df['dse'] * 2
+
+                fig, ax = plt.subplots()
+                sns.scatterplot(comp_df, x='$t_> = t - t_{\\mathrm{peak}}$ [$t_{M_f}$]', y='elpd_diff_doub', hue='model', s=70, ax=ax)
+                for i in range(len(comp_df)):
+                    if comp_df.iloc[i]['rank'] != 0:
+                        ax.errorbar(x=comp_df.iloc[i]['$t_> = t - t_{\\mathrm{peak}}$ [$t_{M_f}$]'], y=comp_df.iloc[i]['elpd_diff_doub'], yerr=comp_df.iloc[i]['dse_doub'], 
+                                    lw=0, elinewidth=2, c=f'C{list(comp_df.index.unique()).index(comp_df.index[i])}', capsize=7, capthick=2, zorder=-1)
+                ax.set_ylabel('$2 \\times \Delta \mathrm{ELPD} \sim |\Delta \chi^2|$')
+                ax.axhline(0, c='gray', ls='--', zorder=-1)
+                ax.grid(alpha=0.2)
+                ax.set_yticks(np.arange(0, 10))
+                ax.set_ylim(9, -1)
+                plt.savefig(str(comp_figpath), bbox_inches='tight')
 
 
 if __name__ == "__main__":

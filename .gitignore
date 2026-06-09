@@ -4,3 +4,4 @@ notebooks/
 **/sxs_sims/*
 **/__pycache__/
 **/.ipynb_checkpoints/
+**/*.hdf5

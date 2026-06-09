@@ -30,7 +30,7 @@ def main():
 
     parser.add_argument("--modes", required=True, nargs='+', help="Kerr modes to inject, specified as a list of strings of the form 'lmn', e.g. --modes 220 221")
 
-    parser.add_argument("--df", required=False, default=0, help='Fractional frequency shift applied to damped sinusoid(s) before t0. Default is 0 (no shift).')
+    parser.add_argument("--df", required=False, default=0, type=float, help='Fractional frequency shift applied to damped sinusoid(s) before t0. Default is 0 (no shift).')
 
     parser.add_argument("--snr", required=False, default=20, help='Target post-peak SNR of the injection. Default is 20.')
 
