@@ -69,11 +69,12 @@ def main():
                     # print(df['run'].unique())
                     dfs[combo] = df
                 except (OSError, ValueError) as e:
+                    ### results not yet available or being actively written to .nc file
                     print(e)
 
             ### MCHI SUMMARY PLOT ###
-            print('Making mchi plots...')
-            if not mchi_figpath.exists():
+            if (not mchi_figpath.exists()) or (args.suffix is not False):
+                print('Making mchi plots...')
                 fig, ax = plt.subplots(1, len(dfs), figsize=(11*1.5, 5), sharex=True, sharey=True)
                 if len(dfs) == 1:
                     ax = [ax]
@@ -90,8 +91,8 @@ def main():
                 plt.savefig(str(mchi_figpath), bbox_inches='tight')
 
             ### AMPS SUMMARY PLOT ###
-            print('Making amplitude plots...')
-            if not amps_figpath.exists():
+            if (not amps_figpath.exists()) or (args.suffix is not False):
+                print('Making amplitude plots...')
                 tref = 0
                 a_true_df = {mode: get_projection(dfs[combo_true], mode, tref) for mode in modes_true}
 
