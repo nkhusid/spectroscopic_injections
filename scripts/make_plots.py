@@ -14,6 +14,8 @@ def main():
 
     parser.add_argument('--path', required=True, help='Relative path to the directory containing the results for the injection, e.g. "DS/220".')
 
+    parser.add_argument('--suffix', required=False, default=False, nargs='+', help='Specify specific injections for which to generate plots.')
+
     # parser.add_argument('--ringup', required=False, default='equal', help='Morphology for the ringup of the ')
 
     args = parser.parse_args()
@@ -29,14 +31,23 @@ def main():
 
     # Group by full suffix (everything after the 'fmin*Hz')
     groups = {}
-    for name in subdirs:
-        suffix = f'{name.split("Hz", 1)[1]}' if "_" in name else ''
-        if suffix not in groups:
-            groups[suffix] = []
-        groups[suffix].append(name)
+    if not args.suffix:
+        for name in subdirs:
+            suffix = f'{name.split("Hz", 1)[1]}' if "_" in name else ''
+            if suffix not in groups:
+                groups[suffix] = []
+            groups[suffix].append(name)
+    else:
+        for name in subdirs:
+            suffix = f'{name.split("Hz", 1)[1]}' if "_" in name else ''
+            if suffix[1:] in args.suffix:
+                if suffix not in groups:
+                    groups[suffix] = []
+                groups[suffix].append(name)
     # print(groups)
 
     for group, grouped_subdirs in groups.items():
+        print(group)
 
         mchi_figpath = savedir / f'mchi_summary{group}.pdf'
         amps_figpath = savedir / f'amps_summary{group}.pdf'

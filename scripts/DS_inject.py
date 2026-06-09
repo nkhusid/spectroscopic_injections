@@ -185,7 +185,8 @@ def main():
                 if i > 0:
                     df_min[i] = dg_min[i] = -0.8
                     df_max[i] = dg_max[i] = 0.8
-            fit.update_info('model', **{'df_min': list(df_min),
+            tgrfit = fit.copy()
+            tgrfit.update_info('model', **{'df_min': list(df_min),
                                         'df_max': list(df_max),
                                         'dg_min': list(dg_min),
                                         'dg_max': list(dg_max)})
@@ -193,7 +194,7 @@ def main():
             if not tgrdir.exists():
                 tgrdir.mkdir(parents=True)
             tgrcombo = combo.replace('+', '+d')
-            fit.to_config(str(tgrdir / f'{tgrcombo}_{filename}.ini'))
+            tgrfit.to_config(str(tgrdir / f'{tgrcombo}_{filename}.ini'))
 
 
 if __name__ == "__main__":
