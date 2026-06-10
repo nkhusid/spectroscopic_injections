@@ -67,15 +67,15 @@ def get_projection(df, mode, t0ref):
 
     return a_df
 
-def plot_projection(a_df, cis, ax, a_scale=1e-21):
+def plot_projection(a_df, cis, ax, color='gray', a_scale=1e-21):
     t = np.array(a_df.columns.values)
     for ci in cis:
         lohi = a_df.apply(lambda x: az.hdi(x.values, ci)).T
         ax.fill_between(
             t, 
             lohi.iloc[:,0]/a_scale, lohi.iloc[:,1]/a_scale,
-            alpha=0.05, 
-            color='gray', 
+            alpha=0.1, 
+            color=color, 
             zorder=-100,
             lw=0
         )
