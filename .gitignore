@@ -1,7 +1,10 @@
 notebooks/
 **/.deprecated/
-**/sxs_sims/
-**/sxs_sims/*
 **/__pycache__/
 **/.ipynb_checkpoints/
 **/*.hdf5
+
+**/sxs_sims/*/**
+!**/sxs_sims/
+!**/sxs_sims/*
+!**/sxs_sims/*/SXS*.h5
