@@ -224,36 +224,31 @@ def main():
 
                 # a_true_df = {mode: get_projection(dfs[combo_true], mode, tref) for mode in modes_true}
 
-                fig, ax = plt.subplots(len(modes_true), 1, figsize=(8, 4), layout='constrained', sharex=True)
+                fig, ax = plt.subplots(max([len(combo.split('+')) for combo in a_dfs.keys()]), 1, figsize=(8, 4), layout='constrained', sharex=True)
                 a_scale = 1e-21
                 clevs = [0.9]
 
                 if type(ax) is not np.ndarray:
                     ax = [ax]
 
-                ax[len(modes_true)-1].set_xlabel('$t_> = t - t_{\\mathrm{peak}}$ [$t_{M_f}$]', fontsize=18)
-                ax[len(modes_true)-1].set_xticks(np.arange(-12, 15, 3))
-
-                # c = sns.color_palette('Oranges', n_colors=1)[0]
-
-                # for i, mode in enumerate(modes_true):
-                #     plot_projection(a_true_df[mode], clevs, ax[i])
+                ax[len(ax)-1].set_xlabel('$t_> = t - t_{\\mathrm{peak}}$ [$t_{M_f}$]', fontsize=18)
+                ax[len(ax)-1].set_xticks(np.arange(-12, 15, 3))
 
                 legend_handles = []
                 for mark, (combo, df) in enumerate(dfs.items()):
                     c = f'C{mark}'
 
                     for i, mode in enumerate(combo.split('+')):
-                        if i < len(modes_true):
-                            shift = np.linspace(-0.15, 0.15, len(dfs))[mark]
-                            plot_scan(df, mode, clevs, c, ax[i], marker=filled[mark+1], shift=shift)
-                            plot_projection(a_dfs[combo][mode], clevs, ax[i], color=c)
-                            ax[i].axvline(trefs[combo]+shift, ls=':', lw=1, color=c)
+                        # if i < len(modes_true):
+                        shift = np.linspace(-0.15, 0.15, len(dfs))[mark]
+                        plot_scan(df, mode, clevs, c, ax[i], marker=filled[mark+1], shift=shift)
+                        plot_projection(a_dfs[combo][mode], clevs, ax[i], color=c)
+                        ax[i].axvline(trefs[combo]+shift, ls=':', lw=1, color=c)
 
-                            ax[i].set_ylabel(f'$A_{{{i}}}$ [$10^{{{int(np.log10(a_scale))}}}$]', fontsize=18)
-                            ax[i].set_xlim(-12.5, 12.5)
-                            ax[i].set_ylim(0, 10)
-                            ax[i].tick_params(axis='both', labelsize=16, direction='in')
+                        ax[i].set_ylabel(f'$A_{{{i}}}$ [$10^{{{int(np.log10(a_scale))}}}$]', fontsize=18)
+                        ax[i].set_xlim(-12.5, 12.5)
+                        ax[i].set_ylim(0, 10)
+                        ax[i].tick_params(axis='both', labelsize=16, direction='in')
                     
                     legend_handles.append(Line2D([0, 0], [0, 1], color=c, marker=filled[mark+1], 
                                                     linestyle='-', linewidth=2, label='Kerr '+combo, 
