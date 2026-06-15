@@ -253,12 +253,8 @@ def main():
                 ref_loga_scales = np.ones((len(dfs),)) * np.log10(ref_a_scale)
                 for i in range(nrows):
                     loga_scales = np.array([np.floor(np.log10(np.median(df[df['run'] == trefs[combo]][f"a_{combo.split('+')[i]}"].values))) if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
-                    # loga_scales = []
-                    # for combo, df in dfs.items():
-                    #     if len()
-                    #     if f"a_{combo.split('+')[i]}" in df.keys()
 
-                    print(loga_scales > ref_loga_scales)
+                    # print(loga_scales > ref_loga_scales)
                     if (loga_scales > ref_loga_scales).any():
                         mode_a_scales[i] = 10 ** max(loga_scales[loga_scales > ref_loga_scales])
                     else:
