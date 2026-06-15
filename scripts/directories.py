@@ -2,9 +2,9 @@ from pathlib import Path
 
 condir = Path('/mnt/home/nkhusid/spec_inj/configs')
 
-datdir = Path('/mnt/home/nkhusid/spec_inj/data/injections')
+datdir = Path('/mnt/home/nkhusid/spec_inj/data')
 
-sxsdir = Path('/mnt/home/nkhusid/spec_inj/data/sxs_sims')
+simdir = Path('/mnt/home/nkhusid/spec_inj/data/sxs_sims')
 
 resdir = Path('/mnt/home/nkhusid/ceph/spec_inj')
 

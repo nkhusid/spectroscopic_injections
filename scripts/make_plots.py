@@ -31,6 +31,22 @@ def main():
     combo_true = args.path.split('/')[-1]
     modes_true = combo_true.split('+')
 
+    class remnant(remnant_ds):
+        def __init__(self):
+            if 'DS' in args.path:
+                self.m = remnant_ds.m
+                self.chi = remnant_ds.chi
+
+            else:
+                config_path = glob.glob(str(dirs.condir / args.path / '*.ini'))[0]
+                config = rd.utils.load_config(config_path)
+                self.m = float(config['remnant_nr']['mf_true'])
+                self.chi = float(config['remnant_nr']['cf_true'])
+
+    remnant = remnant()
+    print('Remnant true final mass:', remnant.m)
+    print('Remnant true final spin:', remnant.chi)
+
     resdir = dirs.resdir / args.path
     subdirs = [x.name for x in resdir.iterdir() if x.is_dir()]
 
@@ -82,6 +98,7 @@ def main():
                     # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
                     colls[combo] = coll
                     df = coll.get_parameter_dataframe(ndraw=500, prng=13)
+                    TM = rd.qnms.T_MSUN * remnant.m
                     df['run'] = round((df['run'] - t0) / TM)
                     # print(df['run'].unique())
                     dfs[combo] = df
@@ -100,10 +117,13 @@ def main():
                     legend = True
                     if i != 0:
                         legend = False
-                    plot_mfcf_man(df, m, chi, ax[i], legend=legend, **dict(palette='Oranges_r'))
+                    plot_mfcf_man(df, remnant.m, remnant.chi, ax[i], legend=legend, **dict(palette='Oranges_r'))
                     ax[i].set_title(f'QNM model: {combo}')
 
-                fig.suptitle(f'DS injection: Kerr {combo_true}')
+                if 'DS' in args.path:
+                    fig.suptitle(f'DS injection: Kerr {combo_true}')
+                else:
+                    fig.suptitle(f"{args.path.split('/')[0]}: total mass {combo_true.split('mtot')[-1]}$M_{{\odot}}$, {group.split('_')[-1]}")
 
                 plt.savefig(str(mchi_figpath), bbox_inches='tight')
 
@@ -166,7 +186,7 @@ def main():
                     loo_colls = copy.deepcopy(colls)
 
                     for combo, coll in loo_colls.items():
-                        coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
+                        coll.reindex_by_t0(reference_mass=remnant.m, reference_time=t0, decimals=1)
 
                     loo_dict = pd.DataFrame({combo: [r.idx[s].loo.elpd_loo for s in dfs[combo]['run'].unique()] for combo, r in loo_colls.items()}, index=np.array(dfs[list(dfs.keys())[0]]['run'].unique()))
 
@@ -224,8 +244,23 @@ def main():
 
                 # a_true_df = {mode: get_projection(dfs[combo_true], mode, tref) for mode in modes_true}
 
-                fig, ax = plt.subplots(max([len(combo.split('+')) for combo in a_dfs.keys()]), 1, figsize=(8, 4), layout='constrained', sharex=True)
-                a_scale = 1e-21
+                nrows = max([len(combo.split('+')) for combo in a_dfs.keys()])
+
+                fig, ax = plt.subplots(nrows, 1, figsize=(8, 4), layout='constrained', sharex=True)
+                
+                mode_a_scales = {}
+                ref_a_scale = 1e-21
+                ref_loga_scales = np.ones((len(dfs),)) * np.log10(ref_a_scale)
+                for i in range(nrows):
+                    loga_scales = np.array([np.floor(np.log10(np.median(df[df['run'] == trefs[combo]][f"a_{combo.split('+')[i]}"].values))) if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
+                    # loga_scales = []
+                    # for combo, df in dfs.items():
+                    #     if len()
+                    #     if f"a_{combo.split('+')[i]}" in df.keys()
+
+                    print(loga_scales > ref_loga_scales)
+                    mode_a_scales[i] = 10 ** max(loga_scales[loga_scales > ref_loga_scales])
+
                 clevs = [0.9]
 
                 if type(ax) is not np.ndarray:
@@ -241,13 +276,13 @@ def main():
                     for i, mode in enumerate(combo.split('+')):
                         # if i < len(modes_true):
                         shift = np.linspace(-0.15, 0.15, len(dfs))[mark]
-                        plot_scan(df, mode, clevs, c, ax[i], marker=filled[mark+1], shift=shift)
-                        plot_projection(a_dfs[combo][mode], clevs, ax[i], color=c)
+                        plot_scan(df, mode, clevs, c, ax[i], marker=filled[mark+1], shift=shift, a_scale=mode_a_scales[i])
+                        plot_projection(a_dfs[combo][mode], clevs, ax[i], color=c, a_scale=mode_a_scales[i])
                         ax[i].axvline(trefs[combo]+shift, ls=':', lw=1, color=c)
 
-                        ax[i].set_ylabel(f'$A_{{{i}}}$ [$10^{{{int(np.log10(a_scale))}}}$]', fontsize=18)
+                        ax[i].set_ylabel(f'$A_{{{i}}}$ [$10^{{{int(np.log10(mode_a_scales[i]))}}}$]', fontsize=18)
                         ax[i].set_xlim(-12.5, 12.5)
-                        ax[i].set_ylim(0, 10)
+                        ax[i].set_ylim(0, 6)
                         ax[i].tick_params(axis='both', labelsize=16, direction='in')
                     
                     legend_handles.append(Line2D([0, 0], [0, 1], color=c, marker=filled[mark+1], 

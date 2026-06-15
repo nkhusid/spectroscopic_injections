@@ -11,12 +11,14 @@ import seaborn as sns
 import ringdown as rd
 
 import directories as dirs
-import DS_inject as inj
+import DS_inject as inj_ds
 
-t0 = inj.t0
-m = inj.m
-chi = inj.chi
-TM = rd.qnms.T_MSUN * m
+t0 = inj_ds.t0
+
+class remnant_ds:
+    m = inj_ds.m
+    chi = inj_ds.chi
+    # TM = rd.qnms.T_MSUN * m
 
 ##### remnant final mass and spin #####
 def plot_mfcf_man(df, mf_true, cf_true, ax, legend=True, **ckws):
@@ -36,7 +38,7 @@ def plot_mfcf_man(df, mf_true, cf_true, ax, legend=True, **ckws):
     ax.axhline(cf_true, ls='--', c='k', alpha=0.5, zorder=-10);
     
     # add custom legend
-    TM = rd.qnms.T_MSUN * mf_true
+    # TM = rd.qnms.T_MSUN * mf_true
     t0s = df['run'].unique()
     lines = [Line2D([0], [0], color=sns.color_palette(palette, n_colors=len(t0s))[i]) for i in range(len(t0s))]
     labels = [f'{t:.0f}' for t in t0s]
@@ -58,7 +60,7 @@ def plot_mfcf_man(df, mf_true, cf_true, ax, legend=True, **ckws):
 def get_projection(df, mode, t0ref):
     t = np.arange(-15, 16, 3)
 
-    TM = m * rd.qnms.T_MSUN
+    TM = remnant_ds.m * rd.qnms.T_MSUN
     tref = (t - t0ref) * TM
 
     ref_df = df[df['run'] == t0ref]
