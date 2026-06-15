@@ -259,7 +259,10 @@ def main():
                     #     if f"a_{combo.split('+')[i]}" in df.keys()
 
                     print(loga_scales > ref_loga_scales)
-                    mode_a_scales[i] = 10 ** max(loga_scales[loga_scales > ref_loga_scales])
+                    if (loga_scales > ref_loga_scales).any():
+                        mode_a_scales[i] = 10 ** max(loga_scales[loga_scales > ref_loga_scales])
+                    else:
+                        mode_a_scales[i] = ref_a_scale
 
                 clevs = [0.9]
 
@@ -282,7 +285,7 @@ def main():
 
                         ax[i].set_ylabel(f'$A_{{{i}}}$ [$10^{{{int(np.log10(mode_a_scales[i]))}}}$]', fontsize=18)
                         ax[i].set_xlim(-12.5, 12.5)
-                        ax[i].set_ylim(0, 6)
+                        ax[i].set_ylim(0, 10)
                         ax[i].tick_params(axis='both', labelsize=16, direction='in')
                     
                     legend_handles.append(Line2D([0, 0], [0, 1], color=c, marker=filled[mark+1], 
