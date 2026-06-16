@@ -249,16 +249,18 @@ def main():
                 fig, ax = plt.subplots(nrows, 1, figsize=(8, 4), layout='constrained', sharex=True)
                 
                 mode_a_scales = {}
+                mode_a_maxes = {}
                 ref_a_scale = 1e-21
                 ref_loga_scales = np.ones((len(dfs),)) * np.log10(ref_a_scale)
                 for i in range(nrows):
                     loga_scales = np.array([np.floor(np.log10(np.median(df[df['run'] == trefs[combo]][f"a_{combo.split('+')[i]}"].values))) if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
-
-                    # print(loga_scales > ref_loga_scales)
                     if (loga_scales > ref_loga_scales).any():
                         mode_a_scales[i] = 10 ** max(loga_scales[loga_scales > ref_loga_scales])
                     else:
                         mode_a_scales[i] = ref_a_scale
+
+                    a_maxes = np.array([az.hdi(df[df['run'] == min(df['run'].unique())][f"a_{combo.split('+')[i]}"].values, 0.9)[1] if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
+                    mode_a_maxes[i] = max(a_maxes) / mode_a_scales[i]
 
                 clevs = [0.9]
 
@@ -281,7 +283,7 @@ def main():
 
                         ax[i].set_ylabel(f'$A_{{{i}}}$ [$10^{{{int(np.log10(mode_a_scales[i]))}}}$]', fontsize=18)
                         ax[i].set_xlim(-12.5, 12.5)
-                        ax[i].set_ylim(0, 10)
+                        ax[i].set_ylim(0, np.ceil(mode_a_maxes[i]))
                         ax[i].tick_params(axis='both', labelsize=16, direction='in')
                     
                     legend_handles.append(Line2D([0, 0], [0, 1], color=c, marker=filled[mark+1], 
