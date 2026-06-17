@@ -1,4 +1,5 @@
-notebooks/
+# notebooks/
+**/.ipynb_checkpoints
 **/.deprecated/
 **/__pycache__/
 **/.ipynb_checkpoints/
