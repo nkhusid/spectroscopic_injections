@@ -90,9 +90,12 @@ def main():
             ### Load all results for a given injection ###
             colls = {}
             dfs = {}
+
+            tgr_colls = {}
             # print(sorted(grouped_subdirs))
             for subdir in sorted(grouped_subdirs):
                 combo = subdir.split('_')[0]
+                # GR results
                 try:
                     coll = rd.ResultCollection.from_netcdf(str(resdir / subdir / 'engine' / '*' / 'result.nc'))
                     # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
@@ -105,6 +108,20 @@ def main():
                 except (OSError, ValueError) as e:
                     ### results not yet available or being actively written to .nc file
                     print(e)
+                # beyond-GR results
+                if '+' in subdir:
+                    try:
+                        coll = rd.ResultCollection.from_netcdf(str(resdir / 'tgr'/ subdir.replace('+', '+d') / 'engine' / '*' / 'result.nc'))
+                        # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
+                        tgr_colls[combo] = coll
+                        # df = coll.get_parameter_dataframe(ndraw=500, prng=13)
+                        # TM = rd.qnms.T_MSUN * remnant.m
+                        # df['run'] = round((df['run'] - t0) / TM)
+                        # # print(df['run'].unique())
+                        # dfs[combo] = df
+                    except (OSError, ValueError) as e:
+                        ### results not yet available or being actively written to .nc file
+                        print(e)
 
             ### MCHI SUMMARY PLOT ###
             if args.mchi:
@@ -293,6 +310,11 @@ def main():
                 leg = ax[0].legend(handles=legend_handles, loc=(0.47, 0.52), frameon=False, ncol=2, fontsize=13)
                 
                 plt.savefig(str(amps_figpath), bbox_inches='tight')
+
+            # ### BEYOND-GR F-GAMMA PLOT
+            # if args.tgr:
+
+
 
 
 if __name__ == "__main__":
