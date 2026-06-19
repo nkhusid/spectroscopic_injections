@@ -122,7 +122,7 @@ def main():
         ra = ra,
         dec = dec,
         psi = psi,
-        inclination = 1e-16, # practically face-on
+        inclination = args.iota + 1e-16, # practically face-on
         dist = dL * snr_scale,
         # phi_ref = 2.41342424662,
         geocent_time = t0,
