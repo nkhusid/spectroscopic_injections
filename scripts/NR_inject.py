@@ -25,7 +25,7 @@ def main():
     iota = parser.add_mutually_exclusive_group(required=False)
     iota.add_argument("--edge-on", dest='iota', action='store_const', const=np.pi/2, help='Set inclination of the source to be ~pi/2 radians.')
     iota.add_argument("--face-on", dest='iota', action='store_const', const=0, help='Set inclination of the source to be ~0 radians.')
-    iota.add_argument("--inclined", dest='iota', action='store_const', const=np.pi/4, help='Set inclination of the source to be ~pi/4 radians.')
+    iota.add_argument("--inclined", dest='iota', action='store_const', const=np.pi/3, help='Set inclination of the source to be ~pi/3 radians.')
 
     parser.add_argument("--snr", required=False, default=20, help='Target post-peak SNR of the injection. Default is 20.')
 
