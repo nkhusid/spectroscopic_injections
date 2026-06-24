@@ -17,11 +17,13 @@ def main():
 
     parser.add_argument('--suffix', required=False, default=False, nargs='+', help='Specify injections for which to generate plots.')
 
-    parser.add_argument('--no-mchi', action='store_false', dest='mchi', default=True, help='Generate mchi plot. Defaults to True.')
+    parser.add_argument('--no-mchi', action='store_false', dest='mchi', default=True, help='Do not generate mchi plot.')
 
-    parser.add_argument('--no-amps', action='store_false', dest='amps', default=True, help='Generate amplitude decay plot. Defaults to True.')
+    parser.add_argument('--no-amps', action='store_false', dest='amps', default=True, help='Do not generate amplitude decay plot.')
 
-    parser.add_argument('--no-comp', action='store_false', dest='comp', default=True, help='Generate LOO model comparison plot. Defaults to True.')
+    parser.add_argument('--no-comp', action='store_false', dest='comp', default=True, help='Do not generate LOO model comparison plot.')
+
+    parser.add_argument('--no-tgr', action='store_false', dest='tgr', default=True, help='Do not generate beyond-GR df-dg plot.')
 
     parser.add_argument('--no-cache', action='store_false', dest='cache', default=True, help='Do not load cached .hdf5 to generate LOO plot. Defaults to True.')
 
@@ -54,7 +56,7 @@ def main():
     if not savedir.exists():
         savedir.mkdir(parents=True)
 
-    cachedir = dirs.datdir / args.path / 'comp'
+    cachedir = dirs.datdir / 'injections' / args.path / 'comp'
     if not cachedir.exists():
         cachedir.mkdir(parents=True)
 
@@ -244,18 +246,38 @@ def main():
                         comp_df = pd.read_hdf(str(cachepath), key=group)
                     except FileNotFoundError as e:
                         raise FileNotFoundError('Run with --comp True to generate LOO comparison DataFrame for determining amplitude projection time.') from e
-                for combo in comp_df['model'].unique():
-                    model_df = comp_df[comp_df['model'] == combo]
-                    # ts_df = model_df[model_df['elpd_diff'] < 4]
-                    ts = model_df['$t_> = t - t_{\\mathrm{peak}}$ [$t_{M_f}$]'].values
-                    diffs = model_df['elpd_diff'].values
-                    best = diffs < 4
-                    idx = next(b for b in range(len(best)) if np.all(best[b:]))
-                    if idx is None:
-                        tref = max(ts)
-                    else:
-                        tref = ts[idx]
-                    trefs[combo] = tref
+                # for combo in comp_df['model'].unique():
+                #     model_df = comp_df[comp_df['model'] == combo]
+                #     # ts_df = model_df[model_df['elpd_diff'] < 4]
+                #     ts = model_df['$t_> = t - t_{\\mathrm{peak}}$ [$t_{M_f}$]'].values
+                #     diffs = model_df['elpd_diff'].values
+                #     best = diffs < 4
+                #     idx = next(b for b in range(len(best)) if np.all(best[b:]))
+                #     if idx is None:
+                #         tref = max(ts)
+                #     else:
+                #         tref = ts[idx]
+                #     trefs[combo] = tref
+
+                for combo, df in dfs.items():
+                    ts = df['run'].unique()
+                    modes = combo.split('+')
+                    for i, start in enumerate(ts):
+                        # print(start)
+                        start_df = df[df['run'] == start]
+                        a_lo = np.array([az.hdi(start_df[f'a_{mode}'].values, 0.95)[0] for mode in modes])
+                        # print(a_lo)
+                        if np.all(a_lo > 1e-22):
+                            if start == max(ts):
+                                trefs[combo] = start
+                                break
+                            else:
+                                pass
+                        else:
+                            trefs[combo] = ts[i-1]
+                            break
+
+                print(trefs)
 
                 a_dfs = {combo: {mode: get_projection(dfs[combo], mode, tref) for mode in combo.split('+')} for combo, tref in trefs.items()}
 
@@ -264,6 +286,8 @@ def main():
                 nrows = max([len(combo.split('+')) for combo in a_dfs.keys()])
 
                 fig, ax = plt.subplots(nrows, 1, figsize=(8, 4), layout='constrained', sharex=True)
+
+                clevs = [0.68]
                 
                 mode_a_scales = {}
                 mode_a_maxes = {}
@@ -276,10 +300,8 @@ def main():
                     else:
                         mode_a_scales[i] = ref_a_scale
 
-                    a_maxes = np.array([az.hdi(df[df['run'] == min(df['run'].unique())][f"a_{combo.split('+')[i]}"].values, 0.9)[1] if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
+                    a_maxes = np.array([az.hdi(df[df['run'] == min(df['run'].unique())][f"a_{combo.split('+')[i]}"].values, max(clevs))[1] if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
                     mode_a_maxes[i] = max(a_maxes) / mode_a_scales[i]
-
-                clevs = [0.9]
 
                 if type(ax) is not np.ndarray:
                     ax = [ax]
