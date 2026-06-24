@@ -240,12 +240,12 @@ def main():
                 print('Making amplitude plots...')
 
                 trefs = {}
-                if not args.comp:
-                    try:
-                        print('Loading cached loo comp .hdf5 file...')
-                        comp_df = pd.read_hdf(str(cachepath), key=group)
-                    except FileNotFoundError as e:
-                        raise FileNotFoundError('Run with --comp True to generate LOO comparison DataFrame for determining amplitude projection time.') from e
+                # if not args.comp:
+                #     try:
+                #         print('Loading cached loo comp .hdf5 file...')
+                #         comp_df = pd.read_hdf(str(cachepath), key=group)
+                #     except FileNotFoundError as e:
+                #         raise FileNotFoundError('Run with --comp True to generate LOO comparison DataFrame for determining amplitude projection time.') from e
                 # for combo in comp_df['model'].unique():
                 #     model_df = comp_df[comp_df['model'] == combo]
                 #     # ts_df = model_df[model_df['elpd_diff'] < 4]
