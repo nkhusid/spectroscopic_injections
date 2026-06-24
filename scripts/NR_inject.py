@@ -184,7 +184,7 @@ def main():
     
     configdir = dirs.condir / args.sim / f'mtot{int(args.total_mass)}'
     if not configdir.exists():
-        configdir.mkdir()
+        configdir.mkdir(parents=True)
 
     combos = ['220', '220+221', '220+210']
     if args.add_temp is not None:
