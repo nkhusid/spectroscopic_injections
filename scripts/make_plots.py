@@ -6,6 +6,7 @@ filled = list(Line2D.filled_markers)
 
 import argparse
 import copy
+import json
 
 import ringdown as rd
 
@@ -27,11 +28,21 @@ def main():
 
     parser.add_argument('--no-cache', action='store_false', dest='cache', default=True, help='Do not load cached .hdf5 to generate LOO plot. Defaults to True.')
 
+    def parse_key_value(s):
+        try:
+            k, v = s.split('=', 1)
+            return k, float(v)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"Expected KEY=float, got: {s}")
+
+    parser.add_argument('--proj_time', required=False, nargs='+', type=parse_key_value, help='Manual reference projection time for individual QNM models, passed as key-value pairs with mode combo keys and t_> values: --proj_time 220=12 220+221=6 220+210=3.')
+
     # parser.add_argument('--ringup', required=False, default='equal', help='Morphology for the ringup of the ')
 
     args = parser.parse_args()
     combo_true = args.path.split('/')[-1]
     modes_true = combo_true.split('+')
+    proj_time = dict(args.proj_time) if args.proj_time else {}
 
     class remnant(remnant_ds):
         def __init__(self):
@@ -260,22 +271,27 @@ def main():
                 #     trefs[combo] = tref
 
                 for combo, df in dfs.items():
-                    ts = df['run'].unique()
-                    modes = combo.split('+')
-                    for i, start in enumerate(ts):
-                        # print(start)
-                        start_df = df[df['run'] == start]
-                        a_lo = np.array([az.hdi(start_df[f'a_{mode}'].values, 0.95)[0] for mode in modes])
-                        # print(a_lo)
-                        if np.all(a_lo > 1e-22):
-                            if start == max(ts):
-                                trefs[combo] = start
-                                break
+                    if combo in proj_time .keys():
+                        trefs[combo] = proj_time[combo]
+                    else:
+                        ts = df['run'].unique()
+                        modes = combo.split('+')
+                        for i, start in enumerate(ts):
+                            # print(start)
+                            start_df = df[df['run'] == start]
+                            a_lo = np.array([az.hdi(start_df[f'a_{mode}'].values, 0.95)[0] for mode in modes])
+                            # print(a_lo)
+                            if np.all(a_lo > 1e-22):
+                                if start == max(ts):
+                                    print(a_lo)
+                                    trefs[combo] = start
+                                    break
+                                else:
+                                    pass
                             else:
-                                pass
-                        else:
-                            trefs[combo] = ts[i-1]
-                            break
+                                print(a_lo)
+                                trefs[combo] = ts[i-1]
+                                break
 
                 print(trefs)
 
@@ -287,7 +303,7 @@ def main():
 
                 fig, ax = plt.subplots(nrows, 1, figsize=(8, 4), layout='constrained', sharex=True)
 
-                clevs = [0.68]
+                clevs = [0.95, 0.68]
                 
                 mode_a_scales = {}
                 mode_a_maxes = {}
@@ -317,7 +333,7 @@ def main():
                         # if i < len(modes_true):
                         shift = np.linspace(-0.15, 0.15, len(dfs))[mark]
                         plot_scan(df, mode, clevs, c, ax[i], marker=filled[mark+1], shift=shift, a_scale=mode_a_scales[i])
-                        plot_projection(a_dfs[combo][mode], clevs, ax[i], color=c, a_scale=mode_a_scales[i])
+                        plot_projection(a_dfs[combo][mode], [min(clevs)], ax[i], color=c, a_scale=mode_a_scales[i])
                         ax[i].axvline(trefs[combo]+shift, ls=':', lw=1, color=c)
 
                         ax[i].set_ylabel(f'$A_{{{i}}}$ [$10^{{{int(np.log10(mode_a_scales[i]))}}}$]', fontsize=18)
