@@ -26,13 +26,17 @@ def main():
 
     parser.add_argument('--path', required=True, help='Relative path to the directory containing the config files for the injection, e.g. "DS/220".')
 
-    args = parser.parse_args()
+    parser.add_argument('--no-linesub', action='store_false', dest='linesub', default=True, help='Use injections that were not pre-processed with line subtraction before conditioning.')
 
-    submit_runs(relpath=Path(args.path))
+    args = parser.parse_args()
+    if args.linesub:
+        path = Path(args.path) / 'linesub'
+
+    submit_runs(relpath=path)
 
     ##### TGR runs #####
 
-    submit_runs(relpath=Path(args.path) / 'tgr')
+    submit_runs(relpath=path / 'tgr')
 
 if __name__ == "__main__":
     main()

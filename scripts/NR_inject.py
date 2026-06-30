@@ -1,14 +1,14 @@
 import numpy as np
 import h5py
-
-import ringdown as rd
-import directories as dirs
 import glob
-
 import argparse
 
-## GW150914 target
+import ringdown as rd
+import sxs
 
+import directories as dirs
+
+## GW150914 target
 t0 = 1126259462.423
 ra = 1.952318922
 dec = -1.26967171703
@@ -36,6 +36,8 @@ def main():
     parser.add_argument("--step", required=False, default=3, help='Increment for the analysis window time scan in units of M_f. Default is 3.')
 
     parser.add_argument('--add_temp', required=False, default=None, help='Additional mode combos to run.')
+
+    parser.add_argument('--no-linesub', action='store_false', dest='linesub', default=True, help='Do not pre-process injected waveforms with line subtraction before conditioning.')
 
     args = parser.parse_args()
 
@@ -134,7 +136,10 @@ def main():
     # inject signal into rd.Fit object
     fit.inject(**wf_kws, no_noise=True)
 
+    # save the detector-frame injections as .hdf5 files to later load from configs
     outdir = dirs.datdir / 'injections' / args.sim / f'mtot{int(args.total_mass)}'
+    if args.linesub:
+        outdir = outdir / 'linesub'
     if not outdir.exists():
         outdir.mkdir(parents=True)
     if args.iota == 0:
@@ -145,7 +150,25 @@ def main():
         inc = 'inclined'
     filename = f'{args.sim}_fmin10Hz_ppSNR{args.snr}_mtot{int(args.total_mass)}_{inc}'
     for i, s_i in fit.data.items():
-        s_i.to_hdf(str(outdir / f'{filename}_{i}.hdf5'), key=i)
+
+        if args.linesub:
+            ### apply line subtraction to the detector-frame waveforms before they get conditioned to mitigate GW memory filtering artifacts
+
+            # padding the waveform with last value of h from NR sim
+            padding_time = fit.start_times[i] + 0.24
+            ipad = np.argmin(np.abs(s_i.time.values - padding_time))
+            s_i.iloc[ipad:] = s_i.iloc[ipad]
+
+            # line subtraction
+            tser = sxs.TimeSeries(s_i.values, time=s_i.time.values)
+            tser_sub = tser.line_subtraction()
+
+            # save line-subtracted detector-frame injection
+            s_i_sub = rd.Data(tser_sub.ndarray, index=tser_sub.time, ifo=i)
+            s_i_sub.to_hdf(str(outdir / f'{filename}_{i}.hdf5'), key=i)
+        
+        else:
+            s_i.to_hdf(str(outdir / f'{filename}_{i}.hdf5'), key=i)
     
     ## configuring the fit object
     fit.load_data({i: str(outdir / f'{filename}_{i}.hdf5') for i in fit.ifos})
@@ -183,6 +206,8 @@ def main():
     fit.info['condition'].pop('preserve_acfs', None)
     
     configdir = dirs.condir / args.sim / f'mtot{int(args.total_mass)}'
+    if args.linesub:
+        configdir = configdir / 'linesub'
     if not configdir.exists():
         configdir.mkdir(parents=True)
 
