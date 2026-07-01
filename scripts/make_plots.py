@@ -28,6 +28,8 @@ def main():
 
     parser.add_argument('--no-cache', action='store_false', dest='cache', default=True, help='Do not load cached .hdf5 to generate LOO plot. Defaults to True.')
 
+    parser.add_argument('--no-linesub', action='store_false', dest='linesub', default=True, help='Plot results from fits injections that were not pre-processed with line subtraction before conditioning.')
+
     def parse_key_value(s):
         try:
             k, v = s.split('=', 1)
@@ -59,6 +61,9 @@ def main():
     remnant = remnant()
     print('Remnant true final mass:', remnant.m)
     print('Remnant true final spin:', remnant.chi)
+
+    if args.linesub:
+        args.path = args.path+'/linesub'
 
     resdir = dirs.resdir / args.path
     subdirs = [x.name for x in resdir.iterdir() if x.is_dir()]
