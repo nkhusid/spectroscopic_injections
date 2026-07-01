@@ -29,8 +29,9 @@ def main():
     parser.add_argument('--no-linesub', action='store_false', dest='linesub', default=True, help='Use injections that were not pre-processed with line subtraction before conditioning.')
 
     args = parser.parse_args()
+    path = Path(args.path)
     if args.linesub:
-        path = Path(args.path) / 'linesub'
+        path = path / 'linesub'
 
     submit_runs(relpath=path)
 
