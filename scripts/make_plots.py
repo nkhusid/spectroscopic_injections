@@ -46,6 +46,9 @@ def main():
     modes_true = combo_true.split('+')
     proj_time = dict(args.proj_time) if args.proj_time else {}
 
+    if args.linesub:
+        args.path = args.path+'/linesub'
+
     class remnant(remnant_ds):
         def __init__(self):
             if 'DS' in args.path:
@@ -61,9 +64,6 @@ def main():
     remnant = remnant()
     print('Remnant true final mass:', remnant.m)
     print('Remnant true final spin:', remnant.chi)
-
-    if args.linesub:
-        args.path = args.path+'/linesub'
 
     resdir = dirs.resdir / args.path
     subdirs = [x.name for x in resdir.iterdir() if x.is_dir()]
