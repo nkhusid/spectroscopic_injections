@@ -20,6 +20,8 @@ def main():
 
     parser.add_argument('--no-mchi', action='store_false', dest='mchi', default=True, help='Do not generate mchi plot.')
 
+    parser.add_argument('--no-fgamma', action='store_false', dest='fgamma', default=True, help='Do not generate f-gamma plot.')
+
     parser.add_argument('--no-amps', action='store_false', dest='amps', default=True, help='Do not generate amplitude decay plot.')
 
     parser.add_argument('--no-comp', action='store_false', dest='comp', default=True, help='Do not generate LOO model comparison plot.')
@@ -80,10 +82,11 @@ def main():
     groups = {}
     if not args.suffix:
         for name in subdirs:
-            suffix = f'{name.split("Hz", 1)[1]}' if "_" in name else ''
-            if suffix not in groups:
-                groups[suffix] = []
-            groups[suffix].append(name)
+            if 'ringup' not in name:
+                suffix = f'{name.split("Hz", 1)[1]}' if "_" in name else ''
+                if suffix not in groups:
+                    groups[suffix] = []
+                groups[suffix].append(name)
     else:
         for name in subdirs:
             suffix = f'{name.split("Hz", 1)[1]}' if "_" in name else ''
@@ -97,6 +100,7 @@ def main():
         print(group)
 
         mchi_figpath = savedir / f'mchi_summary{group}.pdf'
+        fgamma_figpath = savedir / f'fgamma_summary{group}.pdf'
         amps_figpath = savedir / f'amps_summary{group}.pdf'
         comp_figpath = savedir / f'comp_summary{group}.pdf'
 
@@ -143,8 +147,8 @@ def main():
 
             ### MCHI SUMMARY PLOT ###
             if args.mchi:
-                print('Making mchi plots...')
-                fig, ax = plt.subplots(1, len(dfs), figsize=(11*1.5, 5), sharex=True, sharey=True)
+                print('Making m-chi plots...')
+                fig, ax = plt.subplots(1, len(dfs), figsize=((11*1.5)/3*len(dfs), 5), sharex=True, sharey=True)
                 if len(dfs) == 1:
                     ax = [ax]
 
@@ -161,6 +165,38 @@ def main():
                     fig.suptitle(f"{args.path.split('/')[0]}: total mass {combo_true.split('mtot')[-1]}$M_{{\odot}}$, {group.split('_')[-1]}")
 
                 plt.savefig(str(mchi_figpath), bbox_inches='tight')
+
+            if args.fgamma:
+                print('Making f-gamma plots...')
+                
+                fs = {}
+                gs = {}
+
+                ### finding the frequencies and damping rates of each mode ###
+                for l in [2, 3]: 
+                    for m in range(l+1):
+                        for n in [0, 1]:
+                            f, tau = rd.qnms.get_ftau(remnant.m, remnant.chi, l=l, m=m, n=n)
+                            fs[(l,m,n)] = f
+                            gs[(l,m,n)] = 1/tau
+
+                fig, ax = plt.subplots(1, len(dfs), figsize=((11*1.5)/3*len(dfs), 5), sharex=True, sharey=True)
+                if len(dfs) == 1:
+                    ax = [ax]
+
+                for i, (combo, df) in enumerate(dfs.items()):
+                    legend = True
+                    if i != 0:
+                        legend = False
+                    plot_fg_man(df, combo.split('+'), fs, gs, ax[i], legend=legend)
+                    ax[i].set_title(f'QNM model: {combo}')
+
+                if 'DS' in args.path:
+                    fig.suptitle(f'DS injection: Kerr {combo_true}')
+                else:
+                    fig.suptitle(f"{args.path.split('/')[0]}: total mass {combo_true.split('mtot')[-1]}$M_{{\odot}}$, {group.split('_')[-1]}")
+
+                plt.savefig(str(fgamma_figpath), bbox_inches='tight')
 
             ### AMPS SUMMARY PLOT ###
             # if args.amps:

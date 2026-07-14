@@ -22,10 +22,23 @@ class remnant_ds:
 
 ##### remnant final mass and spin #####
 def plot_mfcf_man(df, mf_true, cf_true, ax, legend=True, **ckws):
-    # g, _ = coll.plot_mass_spin(prng=13, joint_kws=dict(levels=[0.864], palette='coolwarm', alpha=0.85, linewidths=[3, 1], **ckws))
-    # coll.reindex_by_t0(reference_mass=mf_true, reference_time=t0, decimals=1)
-    # df = coll.get_parameter_dataframe(reference_mass=mf_true, ndraw=500, prng=13)
-    # hue_order = df['run'].unique()[::-1]
+    ''' 
+    Plotting the remnant final mass and spin posteriors for a scan of analysis start times with respect to the peak. Takes a posterior dataframe containing samples (chain and draw dimensions collapsed to 1D) with columns 'm', 'chi', and 'run'. The 'run' column serves as an analysis start time label.
+
+    df: pandas.DataFrame
+        dataframe with posterior samples
+    mf_true: float
+        Injected final mass
+    cf_true: float
+        Injected final spin
+    ax: matplotlib.Axes
+        axes object for subplotting
+    legend: bool (default is True)
+        whether or not to include legend on subplot
+    ckws:
+        additional kwargs to pass to seaborn.kdeplot(), including 'palette'
+    '''
+
     runs = df['run'].unique()
     palette = sns.color_palette(ckws.pop('palette', 'coolwarm'), n_colors=len(runs))
     
@@ -55,6 +68,34 @@ def plot_mfcf_man(df, mf_true, cf_true, ax, legend=True, **ckws):
 
     ax.set_xlabel('$M_f$ [$M_{\odot}$]')
     ax.set_ylabel('$\chi_f$')
+
+##### f-gamma timescans #####
+def plot_fg_man(df, modes, fs, gs, ax, legend=True, **ckws):
+
+    runs = df['run'].unique()
+    palette_names = ckws.pop('palette', ['Blues', 'Greens', 'Oranges', 'Purples', 'Reds'])
+    palettes = [sns.color_palette(palette, n_colors=len(runs)) for palette in palette_names]
+
+    for mode in fs.keys():
+        ax.scatter(x=fs[mode], y=gs[mode], color='k', marker='*', s=300, lw=0, zorder=10)
+        ax.text(s=f'{mode[0]}{mode[1]}{mode[2]}', x=fs[mode], y=gs[mode]-(0.075*(max(gs.values()) - min(gs.values()))), ha='center', va='top')
+
+    for i, run in enumerate(df['run'].unique()[::-1]):
+        for m, mode in enumerate(modes):
+            lw = 2
+            if run == 0:
+                lw = 4
+            sns.kdeplot(df[df['run'] == run], x=f'f_{mode}', y=f'g_{mode}', 
+                        color=palettes[m][i], alpha=(i+1)/(len(runs)+2),
+                        linewidths=lw, levels=[0.1], ax=ax)
+
+    ax.set_xlabel('$f$ [Hz]')
+    ax.set_ylabel('$\gamma$ [Hz]')
+
+    frange = max(fs.values()) - min(fs.values())
+    grange = max(gs.values()) - min(gs.values())
+    ax.set_xlim(min(fs.values())-frange*0.25, max(fs.values())+frange*0.25)
+    ax.set_ylim(0, max(gs.values())+grange*0.25)
 
 ##### mode amplitude evolution #####
 def get_projection(df, mode, t0ref):
