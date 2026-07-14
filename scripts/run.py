@@ -39,6 +39,10 @@ def main():
 
     submit_runs(relpath=path / 'tgr')
 
+    ##### DS runs #####
+
+    submit_runs(relpath=path / 'ds')
+
 if __name__ == "__main__":
     main()
 

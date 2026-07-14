@@ -79,6 +79,10 @@ def main():
     print(f'Starting frequency: {f_start} Hz')
     TM = mf_true*rd.qnms.T_MSUN
     print(mf_true, cf_true)
+
+    f_lo, t_lo = rd.qnms.get_ftau(mf_true, cf_true, l=2, m=0, n=0)
+    f_hi, t_hi = rd.qnms.get_ftau(mf_true, cf_true, l=4, m=4, n=1)
+
     # injection params
     dL = 440
     wf_kws = dict(
@@ -212,8 +216,11 @@ def main():
         configdir.mkdir(parents=True)
 
     combos = ['220', '220+221', '220+210']
+    nds = [1, 2]
     if args.add_temp is not None:
-        combos = list(set(combos+args.add_temp))
+        # combos = list(set(combos.append(args.add_temp)))
+        combos.append(args.add_temp)
+        combos = list(set(combos))
     for combo in combos:
         fit.set_modes([(1, -2, int(mode[0]), int(mode[1]), int(mode[2])) for mode in combo.split('+')])
         fit.update_info('model', **{'modes': str(fit.modes)})
@@ -236,6 +243,18 @@ def main():
                 tgrdir.mkdir(parents=True)
             tgrcombo = combo.replace('+', '+d')
             tgrfit.to_config(str(tgrdir / f'{tgrcombo}_{filename}.ini'))
+        
+        dsfit = fit.copy()
+        dsfit.update_info('model', **{'modes': len(fitmodes),
+                                      'f_min': f_lo,
+                                      'f_max': f_hi,
+                                      'g_min': 1/t_lo/3,
+                                      'g_max': 1/t_hi*1.5,
+                                      'mode_ordering': 'f'})
+        dsdir = configdir / 'ds'
+        if not dsdir.exists():
+            dsdir.mkdir(parents=True)
+        dsfit.to_config(str(dsdir / f'{len(fitmodes)}DS_{filename}.ini'))
 
 
 if __name__ == "__main__":
