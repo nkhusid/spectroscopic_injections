@@ -84,6 +84,9 @@ def main():
 
     ############ temp_fit ###########
 
+    f_lo, t_lo = rd.qnms.get_ftau(m, chi, l=2, m=0, n=0)
+    f_hi, t_hi = rd.qnms.get_ftau(m, chi, l=4, m=4, n=1)
+
     ## constructing the damped sinusoid signals in each detector from GW250114-like parameters
     df_pre = args.df
     s = {ifo: rd.Ringdown.from_parameters(time=temp_fit.times[ifo], t0=temp_fit.start_times[ifo],
@@ -196,6 +199,17 @@ def main():
             tgrcombo = combo.replace('+', '+d')
             tgrfit.to_config(str(tgrdir / f'{tgrcombo}_{filename}.ini'))
 
+        dsfit = fit.copy()
+        dsfit.update_info('model', **{'modes': len(fitmodes),
+                                      'f_min': f_lo,
+                                      'f_max': f_hi,
+                                      'g_min': 1/t_lo/3,
+                                      'g_max': 1/t_hi*1.5,
+                                      'mode_ordering': 'f'})
+        dsdir = configdir / 'ds'
+        if not dsdir.exists():
+            dsdir.mkdir(parents=True)
+        dsfit.to_config(str(dsdir / f'{len(fitmodes)}DS_{filename}.ini'))
 
 if __name__ == "__main__":
     main()

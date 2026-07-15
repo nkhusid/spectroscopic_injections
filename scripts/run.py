@@ -30,7 +30,7 @@ def main():
 
     args = parser.parse_args()
     path = Path(args.path)
-    if args.linesub:
+    if args.linesub and 'DS' not in str(path):
         path = path / 'linesub'
 
     submit_runs(relpath=path)
