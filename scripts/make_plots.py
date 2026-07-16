@@ -106,17 +106,19 @@ def main():
 
         cachepath = cachedir / f'loo_comp_df{group}.hdf5'
 
-        ### FOR NON-TGR RUNS ###
-        if 'tgr' not in grouped_subdirs:
+        ### FOR KERR RUNS ONLY ###
+        if 'tgr' not in grouped_subdirs and 'ds' not in grouped_subdirs:
 
             ### Load all results for a given injection ###
             colls = {}
             dfs = {}
 
             tgr_colls = {}
+            ds_colls = {}
             # print(sorted(grouped_subdirs))
             for subdir in sorted(grouped_subdirs):
                 combo = subdir.split('_')[0]
+                print(f'Loading {combo} results...')
                 # GR results
                 try:
                     coll = rd.ResultCollection.from_netcdf(str(resdir / subdir / 'engine' / '*' / 'result.nc'))
@@ -130,8 +132,9 @@ def main():
                 except (OSError, ValueError) as e:
                     ### results not yet available or being actively written to .nc file
                     print(e)
-                # beyond-GR results
+                # beyond-GR results corresponding to multi-mode Kerr models
                 if '+' in subdir:
+                    print('Loading TGR results...')
                     try:
                         coll = rd.ResultCollection.from_netcdf(str(resdir / 'tgr'/ subdir.replace('+', '+d') / 'engine' / '*' / 'result.nc'))
                         # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
@@ -144,6 +147,17 @@ def main():
                     except (OSError, ValueError) as e:
                         ### results not yet available or being actively written to .nc file
                         print(e)
+                # agnostic results corresponding to N-mode Kerr models
+                try:
+                    acombo = f'{len(combo.split("+"))}DS'
+                    if acombo not in ds_colls.keys():
+                        print(f'Loading {acombo} agnostic results...')
+                        coll = rd.ResultCollection.from_netcdf(str(resdir / 'ds'/ subdir.replace(combo, acombo) / 'engine' / '*' / 'result.nc'))
+                        coll.reindex_by_t0(reference_mass=remnant.m, reference_time=t0, decimals=1)
+                        ds_colls[acombo] = coll
+                except (OSError, ValueError) as e:
+                    ### results not yet available or being actively written to .nc file
+                    print(e)
 
             ### MCHI SUMMARY PLOT ###
             if args.mchi:
@@ -180,6 +194,7 @@ def main():
                             fs[(l,m,n)] = f
                             gs[(l,m,n)] = 1/tau
 
+                # Kerr results
                 fig, ax = plt.subplots(1, len(dfs), figsize=((11*1.5)/3*len(dfs), 5), sharex=True, sharey=True)
                 if len(dfs) == 1:
                     ax = [ax]
@@ -197,6 +212,28 @@ def main():
                     fig.suptitle(f"{args.path.split('/')[0]}: total mass {combo_true.split('mtot')[-1]}$M_{{\odot}}$, {group.split('_')[-1]}")
 
                 plt.savefig(str(fgamma_figpath), bbox_inches='tight')
+
+                # Agnostic results
+                fig, ax = plt.subplots(1, len(ds_colls), figsize=((11*1.5)/3*len(ds_colls), 5), sharex=True, sharey=True)
+                if len(ds_colls) == 1:
+                    ax = [ax]
+
+                for i, (combo, coll) in enumerate(ds_colls.items()):
+                    legend = True
+                    if i != 0:
+                        legend = False
+                    plot_fg_man(coll, np.arange(int(combo.split('DS')[0])), fs, gs, ax[i], legend=legend)
+                    ax[i].set_title(f'Agnostic model: {combo}')
+
+                if 'DS' in args.path:
+                    fig.suptitle(f'DS injection: Kerr {combo_true}')
+                else:
+                    fig.suptitle(f"{args.path.split('/')[0]}: total mass {combo_true.split('mtot')[-1]}$M_{{\odot}}$, {group.split('_')[-1]}")
+
+                ds_fg_figpath = savedir / 'ds'
+                if not ds_fg_figpath.exists():
+                    ds_fg_figpath.mkdir(parents=True)
+                plt.savefig(str(ds_fg_figpath / f'fgamma_summary{group}.pdf'), bbox_inches='tight')
 
             ### AMPS SUMMARY PLOT ###
             # if args.amps:
@@ -312,7 +349,7 @@ def main():
                 #     trefs[combo] = tref
 
                 for combo, df in dfs.items():
-                    if combo in proj_time .keys():
+                    if combo in proj_time.keys():
                         trefs[combo] = proj_time[combo]
                     else:
                         ts = df['run'].unique()
@@ -357,7 +394,7 @@ def main():
                     else:
                         mode_a_scales[i] = ref_a_scale
 
-                    a_maxes = np.array([az.hdi(df[df['run'] == min(df['run'].unique())][f"a_{combo.split('+')[i]}"].values, max(clevs))[1] if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
+                    a_maxes = np.array([az.hdi(df[df['run'] == trefs[combo]][f"a_{combo.split('+')[i]}"].values, max(clevs))[1] * 2 if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
                     mode_a_maxes[i] = max(a_maxes) / mode_a_scales[i]
 
                 if type(ax) is not np.ndarray:

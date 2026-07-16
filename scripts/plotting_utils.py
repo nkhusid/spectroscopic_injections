@@ -70,24 +70,34 @@ def plot_mfcf_man(df, mf_true, cf_true, ax, legend=True, **ckws):
     ax.set_ylabel('$\chi_f$')
 
 ##### f-gamma timescans #####
-def plot_fg_man(df, modes, fs, gs, ax, legend=True, **ckws):
+def plot_fg_man(df: pd.DataFrame | rd.ResultCollection, modes, fs, gs, ax, legend=True, **ckws):
 
-    runs = df['run'].unique()
+    if isinstance(df, pd.DataFrame):
+        runs = df['run'].unique()
+    else:
+        coll = df
+        runs = list(coll.idx.keys())
     palette_names = ckws.pop('palette', ['Blues', 'Greens', 'Oranges', 'Purples', 'Reds'])
-    palettes = [sns.color_palette(palette, n_colors=len(runs)) for palette in palette_names]
+    palettes = [sns.color_palette(palette, n_colors=len(runs)+1) for palette in palette_names]
 
     for mode in fs.keys():
         ax.scatter(x=fs[mode], y=gs[mode], color='k', marker='*', s=300, lw=0, zorder=10)
         ax.text(s=f'{mode[0]}{mode[1]}{mode[2]}', x=fs[mode], y=gs[mode]-(0.075*(max(gs.values()) - min(gs.values()))), ha='center', va='top')
 
-    for i, run in enumerate(df['run'].unique()[::-1]):
+    for i, run in enumerate(runs[::-1]):
         for m, mode in enumerate(modes):
             lw = 2
             if run == 0:
                 lw = 4
-            sns.kdeplot(df[df['run'] == run], x=f'f_{mode}', y=f'g_{mode}', 
-                        color=palettes[m][i], alpha=(i+1)/(len(runs)+2),
-                        linewidths=lw, levels=[0.1], ax=ax)
+            if isinstance(df, pd.DataFrame):
+                sns.kdeplot(df[df['run'] == run], x=f'f_{mode}', y=f'g_{mode}', 
+                            color=palettes[m][i], alpha=(i+1)/(len(runs)+2),
+                            linewidths=lw, levels=[0.1], ax=ax)
+            else:
+                sns.kdeplot(x=coll.idx[run].posterior.f[:,:,mode].values.flatten()[::4],
+                            y=coll.idx[run].posterior.g[:,:,mode].values.flatten()[::4], 
+                            color=palettes[m][i], alpha=(i+1)/(len(runs)+1),
+                            linewidths=lw, levels=[0.1], ax=ax)
 
     ax.set_xlabel('$f$ [Hz]')
     ax.set_ylabel('$\gamma$ [Hz]')
