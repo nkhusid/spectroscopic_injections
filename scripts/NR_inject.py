@@ -114,8 +114,8 @@ def main():
     cumsnr = {i: np.sqrt(np.cumsum(d*d)) for i, d in wd.items()}
     ppSNR = float(np.linalg.norm([cs.iloc[-1] for cs in cumsnr.values()]))
     snr_scale = ppSNR / float(args.snr)
-    print(ppSNR)
-    print(snr_scale)
+    print('pre-scaled post-peak SNR:', ppSNR)
+    print('dL scaling factor:', snr_scale)
 
     ############ fit ###########
 
