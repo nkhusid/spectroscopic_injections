@@ -21,12 +21,14 @@ p = res.posterior
 imed = np.argmin(np.abs(p.a[:,:,1].values - np.median(p.a[:,:,1].values)))
 
 ## Obtain reference remnant final mass and spin measurements
-m, chi = p.m.values.flatten()[imed], p.chi.values.flatten()[imed]
-TM = rd.qnms.T_MSUN*m
+chi = p.chi.values.flatten()[imed]
+m = p.m.values.flatten()[imed]
 
 def main():
 
-    parser = argparse.ArgumentParser(description="Construct a damped sinusoid signal injection with parameters similar to GW250114.")
+    parser = argparse.ArgumentParser(description="Construct a damped sinusoid signal injection with parameters similar to GW250114, scaled to some indicated final mass.")
+
+    parser.add_argument('--m', required=False, default=None, type=float, help='Reference final mass of the remnant in solar masses. Default is None, which uses the median overtone amplitude posterior draw from the GW250114 220+221 fit @ 6M.')
 
     parser.add_argument("--modes", required=True, nargs='+', help="Kerr modes to inject, specified as a list of strings of the form 'lmn', e.g. --modes 220 221")
 
@@ -45,6 +47,13 @@ def main():
     parser.add_argument('--add_temp', required=False, default=None, help='Additional mode combos to run.')
 
     args = parser.parse_args()
+
+    if args.m is not None:
+        m = args.m
+
+    TM = rd.qnms.T_MSUN * m
+
+    print(f'Damped sinusoid injection constructed from remnant properties: (M_f, chi_f) = ({m}, {chi})')
     
     ## Damped sinusoids to inject
     modes = args.modes
@@ -137,6 +146,8 @@ def main():
     filename = f'DS_GW250114Kerr_dtaupre0_fmin10Hz_ppSNR{args.snr}_dfpre{args.df}'
     if args.aratio is not None:
         filename += f'_aratio{args.aratio if len(args.aratio) > 1 else args.aratio[0]}'
+    if args.m is not None:
+        filename += f'_Mf{int(args.m)}'
     for i, s_i in s.items():
         s_i.to_hdf(str(outdir / f'{filename}_{i}.hdf5'), key=i)
     
@@ -165,6 +176,10 @@ def main():
                         'm_min': m/2,
                         'm_max': m*2,
                         'marginalized': True})
+    
+    if args.m is not None:
+        fit.update_info('remnant_ds',
+                        **{'mf_true': m, 'cf_true': chi})
 
     fit.info.pop('fake-data', None)
     fit.info['target'].pop('t0', None)

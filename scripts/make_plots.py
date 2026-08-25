@@ -18,6 +18,8 @@ def main():
 
     parser.add_argument('--suffix', required=False, default=False, nargs='+', help='Specify injections for which to generate plots.')
 
+    parser.add_argument('--pe', required=False, default=None, help='Run label of PE to load for NR injections.')
+
     parser.add_argument('--no-mchi', action='store_false', dest='mchi', default=True, help='Do not generate mchi plot.')
 
     parser.add_argument('--no-fgamma', action='store_false', dest='fgamma', default=True, help='Do not generate f-gamma plot.')
@@ -52,20 +54,37 @@ def main():
         args.path = args.path+'/linesub'
 
     class remnant(remnant_ds):
-        def __init__(self):
-            if 'DS' in args.path:
+        def __init__(self, config_path):
+            # if 'DS' in args.path:
+            #     self.m = remnant_ds.m
+            #     self.chi = remnant_ds.chi
+
+            # else:
+            #     config_path = glob.glob(str(dirs.condir / args.path / '*.ini'))[0]
+            #     config = rd.utils.load_config(config_path)
+            #     self.m = float(config['remnant_nr']['mf_true'])
+            #     self.chi = float(config['remnant_nr']['cf_true'])
+
+            # config_path = glob.glob(config_path)
+            config = rd.utils.load_config(config_path)
+            if 'remnant_nr' in config.keys():
+                self.m = float(config['remnant_nr']['mf_true'])
+                self.chi = float(config['remnant_nr']['cf_true'])
+            elif 'remnant_ds' in config.keys():
+                self.m = float(config['remnant_ds']['mf_true'])
+                self.chi = float(config['remnant_ds']['cf_true'])
+            else:
                 self.m = remnant_ds.m
                 self.chi = remnant_ds.chi
 
-            else:
-                config_path = glob.glob(str(dirs.condir / args.path / '*.ini'))[0]
-                config = rd.utils.load_config(config_path)
-                self.m = float(config['remnant_nr']['mf_true'])
-                self.chi = float(config['remnant_nr']['cf_true'])
+    if args.pe is not None:
+        pe_path = dirs.pedir / args.pe / 'result' / 'summarypages' / 'samples' / 'posterior_samples.h5'
 
-    remnant = remnant()
-    print('Remnant true final mass:', remnant.m)
-    print('Remnant true final spin:', remnant.chi)
+        with h5py.File(str(pe_path), 'r') as f:
+            pe_df = pd.DataFrame(np.array(f['NRSur7dq4']['posterior_samples']))
+
+    else:
+        pe_df = None
 
     resdir = dirs.resdir / args.path
     subdirs = [x.name for x in resdir.iterdir() if x.is_dir()]
@@ -98,6 +117,12 @@ def main():
 
     for group, grouped_subdirs in groups.items():
         print(group)
+
+        ref_config = resdir / grouped_subdirs[0] / 'config.ini'
+        print(ref_config)
+        remnant = remnant(str(ref_config))
+        print('Remnant true final mass:', remnant.m)
+        print('Remnant true final spin:', remnant.chi)
 
         mchi_figpath = savedir / f'mchi_summary{group}.pdf'
         fgamma_figpath = savedir / f'fgamma_summary{group}.pdf'
@@ -134,19 +159,20 @@ def main():
                     print(e)
                 # beyond-GR results corresponding to multi-mode Kerr models
                 if '+' in subdir:
-                    print('Loading TGR results...')
-                    try:
-                        coll = rd.ResultCollection.from_netcdf(str(resdir / 'tgr'/ subdir.replace('+', '+d') / 'engine' / '*' / 'result.nc'))
-                        # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
-                        tgr_colls[combo] = coll
-                        # df = coll.get_parameter_dataframe(ndraw=500, prng=13)
-                        # TM = rd.qnms.T_MSUN * remnant.m
-                        # df['run'] = round((df['run'] - t0) / TM)
-                        # # print(df['run'].unique())
-                        # dfs[combo] = df
-                    except (OSError, ValueError) as e:
-                        ### results not yet available or being actively written to .nc file
-                        print(e)
+                    if args.tgr:
+                        print('Loading TGR results...')
+                        try:
+                            coll = rd.ResultCollection.from_netcdf(str(resdir / 'tgr'/ subdir.replace('+', '+d') / 'engine' / '*' / 'result.nc'))
+                            # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
+                            tgr_colls[combo] = coll
+                            # df = coll.get_parameter_dataframe(ndraw=500, prng=13)
+                            # TM = rd.qnms.T_MSUN * remnant.m
+                            # df['run'] = round((df['run'] - t0) / TM)
+                            # # print(df['run'].unique())
+                            # dfs[combo] = df
+                        except (OSError, ValueError) as e:
+                            ### results not yet available or being actively written to .nc file
+                            print(e)
                 # agnostic results corresponding to N-mode Kerr models
                 try:
                     acombo = f'{len(combo.split("+"))}DS'
@@ -170,7 +196,7 @@ def main():
                     legend = True
                     if i != 0:
                         legend = False
-                    plot_mfcf_man(df, remnant.m, remnant.chi, ax[i], legend=legend, **dict(palette='Oranges_r'))
+                    plot_mfcf_man(df, remnant.m, remnant.chi, ax[i], legend=legend, pe_df=pe_df, **dict(palette='Oranges_r'))
                     ax[i].set_title(f'QNM model: {combo}')
 
                 if 'DS' in args.path:
