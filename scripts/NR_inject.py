@@ -39,6 +39,8 @@ def main():
 
     parser.add_argument('--no-linesub', action='store_false', dest='linesub', default=True, help='Do not pre-process injected waveforms with line subtraction before conditioning.')
 
+    parser.add_argument('--no-write', action='store_false', dest='write', default=True, help='Do not write data/config files.')
+
     args = parser.parse_args()
 
     ## temporary rd.Fit object
@@ -116,145 +118,148 @@ def main():
     snr_scale = ppSNR / float(args.snr)
     print('pre-scaled post-peak SNR:', ppSNR)
     print('dL scaling factor:', snr_scale)
+    print('Scaled dL:', dL * snr_scale)
 
-    ############ fit ###########
+    if args.write:
 
-    ## constructing the same NR injection, scaled to the right target post-peak SNR
-    wf_kws = dict(
-        model = 'NR_hdf5',
-        mtot = mtot,
-        q=1,
-        # define extrinsic source parameters
-        ra = ra,
-        dec = dec,
-        psi = psi,
-        inclination = args.iota + 1e-16, # practically face-on
-        dist = dL * snr_scale,
-        # phi_ref = 2.41342424662,
-        geocent_time = t0,
-        f_low = f_start,
-        f_ref = 20,
-        window=True,
-        nr_path = nr_path)
-    
-    # inject signal into rd.Fit object
-    fit.inject(**wf_kws, no_noise=True)
+        ############ fit ###########
 
-    # save the detector-frame injections as .hdf5 files to later load from configs
-    outdir = dirs.datdir / 'injections' / args.sim / f'mtot{int(args.total_mass)}'
-    if args.linesub:
-        outdir = outdir / 'linesub'
-    if not outdir.exists():
-        outdir.mkdir(parents=True)
-    if args.iota == 0:
-        inc = 'faceon'
-    elif args.iota == np.pi/2:
-        inc = 'edgeon'
-    else:
-        inc = 'inclined'
-    filename = f'{args.sim}_fmin10Hz_ppSNR{args.snr}_mtot{int(args.total_mass)}_{inc}'
-    for i, s_i in fit.data.items():
+        ## constructing the same NR injection, scaled to the right target post-peak SNR
+        wf_kws = dict(
+            model = 'NR_hdf5',
+            mtot = mtot,
+            q=1,
+            # define extrinsic source parameters
+            ra = ra,
+            dec = dec,
+            psi = psi,
+            inclination = args.iota + 1e-16, # practically face-on
+            dist = dL * snr_scale,
+            # phi_ref = 2.41342424662,
+            geocent_time = t0,
+            f_low = f_start,
+            f_ref = 20,
+            window=True,
+            nr_path = nr_path)
+        
+        # inject signal into rd.Fit object
+        fit.inject(**wf_kws, no_noise=True)
 
+        # save the detector-frame injections as .hdf5 files to later load from configs
+        outdir = dirs.datdir / 'injections' / args.sim / f'mtot{int(args.total_mass)}'
         if args.linesub:
-            ### apply line subtraction to the detector-frame waveforms before they get conditioned to mitigate GW memory filtering artifacts
-
-            # padding the waveform with last value of h from NR sim
-            padding_time = fit.start_times[i] + 0.24
-            ipad = np.argmin(np.abs(s_i.time.values - padding_time))
-            s_i.iloc[ipad:] = s_i.iloc[ipad]
-
-            # line subtraction
-            tser = sxs.TimeSeries(s_i.values, time=s_i.time.values)
-            tser_sub = tser.line_subtraction()
-
-            # save line-subtracted detector-frame injection
-            s_i_sub = rd.Data(tser_sub.ndarray, index=tser_sub.time, ifo=i)
-            s_i_sub.to_hdf(str(outdir / f'{filename}_{i}.hdf5'), key=i)
-        
+            outdir = outdir / 'linesub'
+        if not outdir.exists():
+            outdir.mkdir(parents=True)
+        if args.iota == 0:
+            inc = 'faceon'
+        elif args.iota == np.pi/2:
+            inc = 'edgeon'
         else:
-            s_i.to_hdf(str(outdir / f'{filename}_{i}.hdf5'), key=i)
-    
-    ## configuring the fit object
-    fit.load_data({i: str(outdir / f'{filename}_{i}.hdf5') for i in fit.ifos})
-    
-    fit.condition_data(f_min=10, ds=1, trim=0)
-    fit.load_acfs({'H1': str(dirs.datdir / 'bilby-NRSur7dq4_high_f_cal_H1_psd_patched4kHz_1e-40.hdf5'), 
-                   'L1': str(dirs.datdir / 'bilby-NRSur7dq4_high_f_cal_L1_psd_patched4kHz_1e-40.hdf5')},
-                   from_psd=True)
-    
-    fit.update_info('pipe', 
-                    **{'seed': 13,
-                        't0-ref': fit.info['target']['t0'],
-                        'm-ref': mf_true,
-                        't0-start': args.start,
-                        't0-stop': args.stop+args.step,
-                        't0-step': args.step})
+            inc = 'inclined'
+        filename = f'{args.sim}_fmin10Hz_ppSNR{args.snr}_mtot{int(args.total_mass)}_{inc}'
+        for i, s_i in fit.data.items():
 
-    fit.update_info('run',
-                        **{'prng': 13,
-                        'store_h_det': True})
+            if args.linesub:
+                ### apply line subtraction to the detector-frame waveforms before they get conditioned to mitigate GW memory filtering artifacts
 
-    fit.update_info('model',
-                        **{'a_scale_max': 1e-19,
-                        'm_min': mf_true/2,
-                        'm_max': mf_true*2,
-                        'marginalized': True})
-    
-    fit.update_info('remnant_nr',
-                        **{'mf_true': mf_true,
-                        'cf_true': cf_true})
+                # padding the waveform with last value of h from NR sim
+                padding_time = fit.start_times[i] + 0.24
+                ipad = np.argmin(np.abs(s_i.time.values - padding_time))
+                s_i.iloc[ipad:] = s_i.iloc[ipad]
 
-    fit.info.pop('fake-data', None)
-    fit.info.pop('injection', None)
-    fit.info['target'].pop('t0', None)
-    fit.info['condition'].pop('preserve_acfs', None)
-    
-    configdir = dirs.condir / args.sim / f'mtot{int(args.total_mass)}'
-    if args.linesub:
-        configdir = configdir / 'linesub'
-    if not configdir.exists():
-        configdir.mkdir(parents=True)
+                # line subtraction
+                tser = sxs.TimeSeries(s_i.values, time=s_i.time.values)
+                tser_sub = tser.line_subtraction()
 
-    combos = ['220', '220+221', '220+210']
-    nds = [1, 2]
-    if args.add_temp is not None:
-        # combos = list(set(combos.append(args.add_temp)))
-        combos.append(args.add_temp)
-        combos = list(set(combos))
-    for combo in combos:
-        fit.set_modes([(1, -2, int(mode[0]), int(mode[1]), int(mode[2])) for mode in combo.split('+')])
-        fit.update_info('model', **{'modes': str(fit.modes)})
-        fit.to_config(str(configdir / f'{combo}_{filename}.ini'))
-
-        fitmodes = combo.split('+')
-        if len(fitmodes) > 1:
-            df_min, df_max, dg_min, dg_max = (np.zeros(np.array(fitmodes).shape) for _ in range(4))
-            for i in range(len(fitmodes)):
-                if i > 0:
-                    df_min[i] = dg_min[i] = -0.8
-                    df_max[i] = dg_max[i] = 0.8
-            tgrfit = fit.copy()
-            tgrfit.update_info('model', **{'df_min': list(df_min),
-                                        'df_max': list(df_max),
-                                        'dg_min': list(dg_min),
-                                        'dg_max': list(dg_max)})
-            tgrdir = configdir / 'tgr'
-            if not tgrdir.exists():
-                tgrdir.mkdir(parents=True)
-            tgrcombo = combo.replace('+', '+d')
-            tgrfit.to_config(str(tgrdir / f'{tgrcombo}_{filename}.ini'))
+                # save line-subtracted detector-frame injection
+                s_i_sub = rd.Data(tser_sub.ndarray, index=tser_sub.time, ifo=i)
+                s_i_sub.to_hdf(str(outdir / f'{filename}_{i}.hdf5'), key=i)
+            
+            else:
+                s_i.to_hdf(str(outdir / f'{filename}_{i}.hdf5'), key=i)
         
-        dsfit = fit.copy()
-        dsfit.update_info('model', **{'modes': len(fitmodes),
-                                      'f_min': f_lo,
-                                      'f_max': f_hi,
-                                      'g_min': 1/t_lo/3,
-                                      'g_max': 1/t_hi*1.5,
-                                      'mode_ordering': 'f'})
-        dsdir = configdir / 'ds'
-        if not dsdir.exists():
-            dsdir.mkdir(parents=True)
-        dsfit.to_config(str(dsdir / f'{len(fitmodes)}DS_{filename}.ini'))
+        ## configuring the fit object
+        fit.load_data({i: str(outdir / f'{filename}_{i}.hdf5') for i in fit.ifos})
+        
+        fit.condition_data(f_min=10, ds=1, trim=0)
+        fit.load_acfs({'H1': str(dirs.datdir / 'bilby-NRSur7dq4_high_f_cal_H1_psd_patched4kHz_1e-40.hdf5'), 
+                    'L1': str(dirs.datdir / 'bilby-NRSur7dq4_high_f_cal_L1_psd_patched4kHz_1e-40.hdf5')},
+                    from_psd=True)
+        
+        fit.update_info('pipe', 
+                        **{'seed': 13,
+                            't0-ref': fit.info['target']['t0'],
+                            'm-ref': mf_true,
+                            't0-start': args.start,
+                            't0-stop': args.stop+args.step,
+                            't0-step': args.step})
+
+        fit.update_info('run',
+                            **{'prng': 13,
+                            'store_h_det': True})
+
+        fit.update_info('model',
+                            **{'a_scale_max': 1e-19,
+                            'm_min': mf_true/2,
+                            'm_max': mf_true*2,
+                            'marginalized': True})
+        
+        fit.update_info('remnant_nr',
+                            **{'mf_true': mf_true,
+                            'cf_true': cf_true})
+
+        fit.info.pop('fake-data', None)
+        fit.info.pop('injection', None)
+        fit.info['target'].pop('t0', None)
+        fit.info['condition'].pop('preserve_acfs', None)
+        
+        configdir = dirs.condir / args.sim / f'mtot{int(args.total_mass)}'
+        if args.linesub:
+            configdir = configdir / 'linesub'
+        if not configdir.exists():
+            configdir.mkdir(parents=True)
+
+        combos = ['220', '220+221', '220+210']
+        nds = [1, 2]
+        if args.add_temp is not None:
+            # combos = list(set(combos.append(args.add_temp)))
+            combos.append(args.add_temp)
+            combos = list(set(combos))
+        for combo in combos:
+            fit.set_modes([(1, -2, int(mode[0]), int(mode[1]), int(mode[2])) for mode in combo.split('+')])
+            fit.update_info('model', **{'modes': str(fit.modes)})
+            fit.to_config(str(configdir / f'{combo}_{filename}.ini'))
+
+            fitmodes = combo.split('+')
+            if len(fitmodes) > 1:
+                df_min, df_max, dg_min, dg_max = (np.zeros(np.array(fitmodes).shape) for _ in range(4))
+                for i in range(len(fitmodes)):
+                    if i > 0:
+                        df_min[i] = dg_min[i] = -0.8
+                        df_max[i] = dg_max[i] = 0.8
+                tgrfit = fit.copy()
+                tgrfit.update_info('model', **{'df_min': list(df_min),
+                                            'df_max': list(df_max),
+                                            'dg_min': list(dg_min),
+                                            'dg_max': list(dg_max)})
+                tgrdir = configdir / 'tgr'
+                if not tgrdir.exists():
+                    tgrdir.mkdir(parents=True)
+                tgrcombo = combo.replace('+', '+d')
+                tgrfit.to_config(str(tgrdir / f'{tgrcombo}_{filename}.ini'))
+            
+            dsfit = fit.copy()
+            dsfit.update_info('model', **{'modes': len(fitmodes),
+                                        'f_min': f_lo,
+                                        'f_max': f_hi,
+                                        'g_min': 1/t_lo/3,
+                                        'g_max': 1/t_hi*1.5,
+                                        'mode_ordering': 'f'})
+            dsdir = configdir / 'ds'
+            if not dsdir.exists():
+                dsdir.mkdir(parents=True)
+            dsfit.to_config(str(dsdir / f'{len(fitmodes)}DS_{filename}.ini'))
 
 
 if __name__ == "__main__":
