@@ -96,12 +96,12 @@ def plot_fg_man(df: pd.DataFrame | rd.ResultCollection, modes, fs, gs, ax, legen
                 lw = 4
             if isinstance(df, pd.DataFrame):
                 sns.kdeplot(df[df['run'] == run], x=f'f_{mode}', y=f'g_{mode}', 
-                            color=palettes[m][i], alpha=(i+1)/(len(runs)+1),
+                            color=palettes[m][i], alpha=(i+1)/(len(runs)),
                             linewidths=lw, levels=[0.1], ax=ax)
             else:
                 sns.kdeplot(x=coll.idx[run].posterior.f[:,:,mode].values.flatten()[::4],
                             y=coll.idx[run].posterior.g[:,:,mode].values.flatten()[::4], 
-                            color=palettes[m][i], alpha=(i+1)/(len(runs)+1),
+                            color=palettes[m][i], alpha=(i+1)/(len(runs)),
                             linewidths=lw, levels=[0.1], ax=ax)
 
     ax.set_xlabel('$f$ [Hz]')
@@ -135,7 +135,7 @@ def plot_projection(a_df, cis, ax, color='gray', a_scale=1e-21):
             alpha=0.1, 
             color=color, 
             zorder=-100,
-            lw=0
+            lw=1.5
         )
 
 def plot_scan(df, mode, cis, color, ax, a_scale=1e-21, marker=None, alpha_scale=1, shift=0):

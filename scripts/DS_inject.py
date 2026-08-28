@@ -26,6 +26,9 @@ m = p.m.values.flatten()[imed]
 
 def main():
 
+    chi = p.chi.values.flatten()[imed]
+    m = p.m.values.flatten()[imed]
+
     parser = argparse.ArgumentParser(description="Construct a damped sinusoid signal injection with parameters similar to GW250114, scaled to some indicated final mass.")
 
     parser.add_argument('--m', required=False, default=None, type=float, help='Reference final mass of the remnant in solar masses. Default is None, which uses the median overtone amplitude posterior draw from the GW250114 220+221 fit @ 6M.')
@@ -33,6 +36,8 @@ def main():
     parser.add_argument("--modes", required=True, nargs='+', help="Kerr modes to inject, specified as a list of strings of the form 'lmn', e.g. --modes 220 221")
 
     parser.add_argument("--df", required=False, default=0, type=float, help='Fractional frequency shift applied to damped sinusoid(s) before t0. Default is 0 (no shift).')
+
+    parser.add_argument("--dtau", required=False, default=0, type=float, help='Fractional damping time shift applied to damped sinusoid(s) before t0. Default is 0 (no shift).')
 
     parser.add_argument("--snr", required=False, default=20, help='Target post-peak SNR of the injection. Default is 20.')
 
@@ -44,7 +49,11 @@ def main():
 
     parser.add_argument("--step", required=False, default=3, help='Increment for the analysis window time scan in units of M_f. Default is 3.')
 
-    parser.add_argument('--add_temp', required=False, default=None, help='Additional mode combos to run.')
+    parser.add_argument('--add_temp', required=False, nargs='+', default=None, help='Additional mode combos to run.')
+
+    parser.add_argument('--remove_temp', required=False, nargs='+', default=None, help='Remove mode combos to run.')
+
+    parser.add_argument('--no-write', action='store_false', dest='write', default=True, help='Do not write data/config files.')
 
     args = parser.parse_args()
 
@@ -98,10 +107,11 @@ def main():
 
     ## constructing the damped sinusoid signals in each detector from GW250114-like parameters
     df_pre = args.df
+    dtau_pre = args.dtau
     s = {ifo: rd.Ringdown.from_parameters(time=temp_fit.times[ifo], t0=temp_fit.start_times[ifo],
                                 a=a, ellip=ellip, theta=theta, phi=phi,
                                 omega=omega, g=gamma,
-                                dtau_pre=np.array([0]), 
+                                dtau_pre=np.array([dtau_pre]), 
                                 df_pre=np.array([df_pre]),
                                 two_sided=True,
                                 ) for ifo in temp_fit.ifos}
@@ -129,10 +139,11 @@ def main():
 
     ## constructing the damped sinusoid signals in each detector from GW250114-like parameters, scaled to the right target post-peak SNR
     df_pre = args.df
+    dtau_pre = args.dtau
     s = {ifo: rd.Ringdown.from_parameters(time=fit.times[ifo], t0=fit.start_times[ifo],
                                 a=a/snr_scale, ellip=ellip, theta=theta, phi=phi,
                                 omega=omega, g=gamma,
-                                dtau_pre=np.array([0]), 
+                                dtau_pre=np.array(dtau_pre), 
                                 df_pre=np.array([df_pre]),
                                 two_sided=True,
                                 ) for ifo in fit.ifos}
@@ -143,88 +154,92 @@ def main():
     outdir = dirs.datdir / 'injections' / 'DS' / modesstr
     if not outdir.exists():
         outdir.mkdir(parents=True)
-    filename = f'DS_GW250114Kerr_dtaupre0_fmin10Hz_ppSNR{args.snr}_dfpre{args.df}'
+    filename = f'DS_GW250114Kerr_fmin10Hz_ppSNR{args.snr}_dfpre{args.df}_dtaupre{args.dtau}'
     if args.aratio is not None:
         filename += f'_aratio{args.aratio if len(args.aratio) > 1 else args.aratio[0]}'
     if args.m is not None:
         filename += f'_Mf{int(args.m)}'
     for i, s_i in s.items():
         s_i.to_hdf(str(outdir / f'{filename}_{i}.hdf5'), key=i)
-    
-    ## configuring the fit object
-    fit.load_data({i: str(outdir / f'{filename}_{i}.hdf5') for i in fit.ifos})
-    
-    fit.condition_data(f_min=10, ds=1, trim=0)
-    fit.load_acfs({'H1': str(dirs.datdir / 'bilby-NRSur7dq4_high_f_cal_H1_psd_patched4kHz_1e-40.hdf5'), 
-                   'L1': str(dirs.datdir / 'bilby-NRSur7dq4_high_f_cal_L1_psd_patched4kHz_1e-40.hdf5')},
-                   from_psd=True)
-    
-    fit.update_info('pipe', 
-                    **{'seed': 13,
-                        't0-ref': fit.info['target']['t0'],
-                        'm-ref': m,
-                        't0-start': args.start,
-                        't0-stop': args.stop+args.step,
-                        't0-step': args.step})
 
-    fit.update_info('run',
-                        **{'prng': 13,
-                        'store_h_det': True})
+    if args.write:
+        
+        ## configuring the fit object
+        fit.load_data({i: str(outdir / f'{filename}_{i}.hdf5') for i in fit.ifos})
+        
+        fit.condition_data(f_min=10, ds=1, trim=0)
+        fit.load_acfs({'H1': str(dirs.datdir / 'bilby-NRSur7dq4_high_f_cal_H1_psd_patched4kHz_1e-40.hdf5'), 
+                    'L1': str(dirs.datdir / 'bilby-NRSur7dq4_high_f_cal_L1_psd_patched4kHz_1e-40.hdf5')},
+                    from_psd=True)
+        
+        fit.update_info('pipe', 
+                        **{'seed': 13,
+                            't0-ref': fit.info['target']['t0'],
+                            'm-ref': m,
+                            't0-start': args.start,
+                            't0-stop': args.stop+args.step,
+                            't0-step': args.step})
 
-    fit.update_info('model',
-                        **{'a_scale_max': 1e-19,
-                        'm_min': m/2,
-                        'm_max': m*2,
-                        'marginalized': True})
-    
-    if args.m is not None:
-        fit.update_info('remnant_ds',
-                        **{'mf_true': m, 'cf_true': chi})
+        fit.update_info('run',
+                            **{'prng': 13,
+                            'store_h_det': True})
 
-    fit.info.pop('fake-data', None)
-    fit.info['target'].pop('t0', None)
-    
-    configdir = dirs.condir / 'DS' / modesstr
-    if not configdir.exists():
-        configdir.mkdir()
+        fit.update_info('model',
+                            **{'a_scale_max': 1e-19,
+                            'm_min': m/2,
+                            'm_max': m*2,
+                            'marginalized': True})
+        
+        if args.m is not None:
+            fit.update_info('remnant_ds',
+                            **{'mf_true': m, 'cf_true': chi})
 
-    combos = ['220', '220+221', '220+210']
-    if args.add_temp is not None:
-        combos = list(set(combos+args.add_temp))
-    for combo in combos:
-        fit.set_modes([(1, -2, int(mode[0]), int(mode[1]), int(mode[2])) for mode in combo.split('+')])
-        fit.update_info('model', **{'modes': str(fit.modes)})
-        fit.to_config(str(configdir / f'{combo}_{filename}.ini'))
+        fit.info.pop('fake-data', None)
+        fit.info['target'].pop('t0', None)
+        
+        configdir = dirs.condir / 'DS' / modesstr
+        if not configdir.exists():
+            configdir.mkdir()
 
-        fitmodes = combo.split('+')
-        if len(fitmodes) > 1:
-            df_min, df_max, dg_min, dg_max = (np.zeros(np.array(fitmodes).shape) for _ in range(4))
-            for i in range(len(fitmodes)):
-                if i > 0:
-                    df_min[i] = dg_min[i] = -0.8
-                    df_max[i] = dg_max[i] = 0.8
-            tgrfit = fit.copy()
-            tgrfit.update_info('model', **{'df_min': list(df_min),
-                                        'df_max': list(df_max),
-                                        'dg_min': list(dg_min),
-                                        'dg_max': list(dg_max)})
-            tgrdir = configdir / 'tgr'
-            if not tgrdir.exists():
-                tgrdir.mkdir(parents=True)
-            tgrcombo = combo.replace('+', '+d')
-            tgrfit.to_config(str(tgrdir / f'{tgrcombo}_{filename}.ini'))
+        combos = ['220', '220+221', '220+210']
+        if args.add_temp is not None:
+            combos = list(set(combos+args.add_temp))
+        if args.remove_temp is not None:
+            combos = [x for x in combos if x not in args.remove_temp]
+        for combo in combos:
+            fit.set_modes([(1, -2, int(mode[0]), int(mode[1]), int(mode[2])) for mode in combo.split('+')])
+            fit.update_info('model', **{'modes': str(fit.modes)})
+            fit.to_config(str(configdir / f'{combo}_{filename}.ini'))
 
-        dsfit = fit.copy()
-        dsfit.update_info('model', **{'modes': len(fitmodes),
-                                      'f_min': f_lo,
-                                      'f_max': f_hi,
-                                      'g_min': 1/t_lo/3,
-                                      'g_max': 1/t_hi*1.5,
-                                      'mode_ordering': 'f'})
-        dsdir = configdir / 'ds'
-        if not dsdir.exists():
-            dsdir.mkdir(parents=True)
-        dsfit.to_config(str(dsdir / f'{len(fitmodes)}DS_{filename}.ini'))
+            fitmodes = combo.split('+')
+            if len(fitmodes) > 1:
+                df_min, df_max, dg_min, dg_max = (np.zeros(np.array(fitmodes).shape) for _ in range(4))
+                for i in range(len(fitmodes)):
+                    if i > 0:
+                        df_min[i] = dg_min[i] = -0.8
+                        df_max[i] = dg_max[i] = 0.8
+                tgrfit = fit.copy()
+                tgrfit.update_info('model', **{'df_min': list(df_min),
+                                            'df_max': list(df_max),
+                                            'dg_min': list(dg_min),
+                                            'dg_max': list(dg_max)})
+                tgrdir = configdir / 'tgr'
+                if not tgrdir.exists():
+                    tgrdir.mkdir(parents=True)
+                tgrcombo = combo.replace('+', '+d')
+                tgrfit.to_config(str(tgrdir / f'{tgrcombo}_{filename}.ini'))
+
+            dsfit = fit.copy()
+            dsfit.update_info('model', **{'modes': len(fitmodes),
+                                        'f_min': f_lo,
+                                        'f_max': f_hi,
+                                        'g_min': 1/t_lo/3,
+                                        'g_max': 1/t_hi*1.5,
+                                        'mode_ordering': 'f'})
+            dsdir = configdir / 'ds'
+            if not dsdir.exists():
+                dsdir.mkdir(parents=True)
+            dsfit.to_config(str(dsdir / f'{len(fitmodes)}DS_{filename}.ini'))
 
 if __name__ == "__main__":
     main()

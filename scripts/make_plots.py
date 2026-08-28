@@ -41,7 +41,18 @@ def main():
         except ValueError:
             raise argparse.ArgumentTypeError(f"Expected KEY=float, got: {s}")
 
+    def parse_key_value_ineq(s):
+            try:
+                k, v = s.split('=', 1)
+                return k, (v[0], float(v[1:]))
+            except ValueError:
+                raise argparse.ArgumentTypeError(f"Expected KEY[< or >]=float, got: {s}")
+
     parser.add_argument('--proj_time', required=False, nargs='+', type=parse_key_value, help='Manual reference projection time for individual QNM models, passed as key-value pairs with mode combo keys and t_> values: --proj_time 220=12 220+221=6 220+210=3.')
+
+    parser.add_argument('--exclude-temp', required=False, nargs='+', default=[], help='Mode combinations to exclude from summary plots.')
+
+    parser.add_argument('--fcut', required=False, nargs='+', type=parse_key_value_ineq, help='Frequency cut (in Hz) on subdominant mode if bimodalities present, with inequality to indicate whether min or max cut. --fcut 220+330=>250 (means, 330 freqs above 250 Hz)')
 
     # parser.add_argument('--ringup', required=False, default='equal', help='Morphology for the ringup of the ')
 
@@ -49,6 +60,7 @@ def main():
     combo_true = args.path.split('/')[-1]
     modes_true = combo_true.split('+')
     proj_time = dict(args.proj_time) if args.proj_time else {}
+    fcut = dict(args.fcut) if args.fcut else {}
 
     if args.linesub:
         args.path = args.path+'/linesub'
@@ -143,47 +155,54 @@ def main():
             # print(sorted(grouped_subdirs))
             for subdir in sorted(grouped_subdirs):
                 combo = subdir.split('_')[0]
-                print(f'Loading {combo} results...')
-                # GR results
-                try:
-                    coll = rd.ResultCollection.from_netcdf(str(resdir / subdir / 'engine' / '*' / 'result.nc'))
-                    # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
-                    colls[combo] = coll
-                    df = coll.get_parameter_dataframe(ndraw=500, prng=13)
-                    TM = rd.qnms.T_MSUN * remnant.m
-                    df['run'] = round((df['run'] - t0) / TM)
-                    # print(df['run'].unique())
-                    dfs[combo] = df
-                except (OSError, ValueError) as e:
-                    ### results not yet available or being actively written to .nc file
-                    print(e)
-                # beyond-GR results corresponding to multi-mode Kerr models
-                if '+' in subdir:
-                    if args.tgr:
-                        print('Loading TGR results...')
-                        try:
-                            coll = rd.ResultCollection.from_netcdf(str(resdir / 'tgr'/ subdir.replace('+', '+d') / 'engine' / '*' / 'result.nc'))
-                            # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
-                            tgr_colls[combo] = coll
-                            # df = coll.get_parameter_dataframe(ndraw=500, prng=13)
-                            # TM = rd.qnms.T_MSUN * remnant.m
-                            # df['run'] = round((df['run'] - t0) / TM)
-                            # # print(df['run'].unique())
-                            # dfs[combo] = df
-                        except (OSError, ValueError) as e:
-                            ### results not yet available or being actively written to .nc file
-                            print(e)
-                # agnostic results corresponding to N-mode Kerr models
-                try:
-                    acombo = f'{len(combo.split("+"))}DS'
-                    if acombo not in ds_colls.keys():
-                        print(f'Loading {acombo} agnostic results...')
-                        coll = rd.ResultCollection.from_netcdf(str(resdir / 'ds'/ subdir.replace(combo, acombo) / 'engine' / '*' / 'result.nc'))
-                        coll.reindex_by_t0(reference_mass=remnant.m, reference_time=t0, decimals=1)
-                        ds_colls[acombo] = coll
-                except (OSError, ValueError) as e:
-                    ### results not yet available or being actively written to .nc file
-                    print(e)
+                if not (combo in args.exclude_temp):
+                    print(f'Loading {combo} results...')
+                    # GR results
+                    try:
+                        coll = rd.ResultCollection.from_netcdf(str(resdir / subdir / 'engine' / '*' / 'result.nc'))
+                        # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
+                        colls[combo] = coll
+                        df = coll.get_parameter_dataframe(ndraw=500, prng=13)
+                        TM = rd.qnms.T_MSUN * remnant.m
+                        df['run'] = round((df['run'] - t0) / TM)
+                        # print(df['run'].unique())
+                        if combo in fcut.keys():
+                            sub_mode = combo.split('+')[-1]
+                            if '<' in fcut[combo][0]:
+                                df = df[df[f'f_{sub_mode}'] < fcut[combo][1]]
+                            else:
+                                df = df[df[f'f_{sub_mode}'] > fcut[combo][1]]
+                        dfs[combo] = df
+                    except (OSError, ValueError) as e:
+                        ### results not yet available or being actively written to .nc file
+                        print(e)
+                    # beyond-GR results corresponding to multi-mode Kerr models
+                    if '+' in subdir:
+                        if args.tgr:
+                            print('Loading TGR results...')
+                            try:
+                                coll = rd.ResultCollection.from_netcdf(str(resdir / 'tgr'/ subdir.replace('+', '+d') / 'engine' / '*' / 'result.nc'))
+                                # coll.reindex_by_t0(reference_mass=m, reference_time=t0, decimals=1)
+                                tgr_colls[combo] = coll
+                                # df = coll.get_parameter_dataframe(ndraw=500, prng=13)
+                                # TM = rd.qnms.T_MSUN * remnant.m
+                                # df['run'] = round((df['run'] - t0) / TM)
+                                # # print(df['run'].unique())
+                                # dfs[combo] = df
+                            except (OSError, ValueError) as e:
+                                ### results not yet available or being actively written to .nc file
+                                print(e)
+                    # agnostic results corresponding to N-mode Kerr models
+                    try:
+                        acombo = f'{len(combo.split("+"))}DS'
+                        if acombo not in ds_colls.keys():
+                            print(f'Loading {acombo} agnostic results...')
+                            coll = rd.ResultCollection.from_netcdf(str(resdir / 'ds'/ subdir.replace(combo, acombo) / 'engine' / '*' / 'result.nc'))
+                            coll.reindex_by_t0(reference_mass=remnant.m, reference_time=t0, decimals=1)
+                            ds_colls[acombo] = coll
+                    except (OSError, ValueError) as e:
+                        ### results not yet available or being actively written to .nc file
+                        print(e)
 
             ### MCHI SUMMARY PLOT ###
             if args.mchi:
@@ -420,7 +439,7 @@ def main():
                     else:
                         mode_a_scales[i] = ref_a_scale
 
-                    a_maxes = np.array([az.hdi(df[df['run'] == trefs[combo]][f"a_{combo.split('+')[i]}"].values, max(clevs))[1] * 2 if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
+                    a_maxes = np.array([np.quantile(df[df['run'] == trefs[combo]][f"a_{combo.split('+')[i]}"].values, 0.5) * 2 if len(combo.split('+')) > i else -100 for combo, df in dfs.items()])
                     mode_a_maxes[i] = max(a_maxes) / mode_a_scales[i]
 
                 if type(ax) is not np.ndarray:

@@ -17,7 +17,7 @@ def submit_runs(relpath):
         outpath = outputdir / file.split(str(configdir / ''))[-1].split('.ini')[0][1:]
         print(str(outpath))
         if not outpath.exists():
-            subprocess.run(['ringdown_pipe', file, '-o', str(outpath), '--submit'])
+            subprocess.run(['ringdown_pipe', file, '-o', str(outpath), '--time', '23:59:00', '--submit'])
 
 
 def main():
