@@ -1,5 +1,6 @@
 # import make_plots
 from make_plots import *
+import matplotlib.ticker as ticker
 
 parser = argparse.ArgumentParser()
 
@@ -46,8 +47,10 @@ for snr in snrs:
     fs = np.fft.rfftfreq(len(h.index.values), d=dt)
     l, = ax[0].loglog(fs, 4*fs*np.abs(h_freq)**2, lw=4)
 ax[0].set_xlim(1, 2048)
-ax[0].set_xlabel("Frequency (Hz)", fontsize=18)
-ax[0].set_ylabel("PSD", fontsize=18)
+# ax[0].set_xlabel("Frequency (Hz)", fontsize=18)
+ax[0].set_ylabel("PSD [Hz$^{-1}$]", fontsize=18)
+ax[0].tick_params(axis='both', which='both', labelsize=16, direction='in')
+ax[0].xaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: f'{int(y)}'))
 # ax[0].legend()
 
 ### bottom panel: measured mode amplitudes 
@@ -77,8 +80,9 @@ if args.amps:
             ax[i+1].set_ylabel(f'$A_{{{mode}}}$ [$10^{{{int(np.log10(1e-21))}}}$]', fontsize=18)
             ax[i+1].set_xlim(-12.5, 12.5)
             ax[i+1].set_xticks(np.arange(-12, 15, 3))
-            ax[i+1].tick_params(axis='both', labelsize=16, direction='in')
+            ax[i+1].tick_params(axis='both', which='both', labelsize=16, direction='in')
             ax[i+1].set_yscale('log')
+            ax[i+1].yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: f'{int(y)}'))
 
         legend_handles.append(Line2D([0, 0], [0, 1], color=c, marker=filled[1], 
                                                 linestyle='-', linewidth=2, label=snr, 
