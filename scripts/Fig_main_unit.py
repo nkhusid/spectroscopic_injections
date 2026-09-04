@@ -129,14 +129,19 @@ def main():
     ### plotting amps
     print('Plotting amps...')
 
+    modecol_map = {'221': 'blue',
+                   '210': 'purple',
+                   '330': 'pink',}
+    acol = modecol_map[modes[-1]]
+
     clevs = [0.95, 0.68]
     a_df = get_projection(df, modes[-1], args.tref)
 
     shift = 0
     a_scale = 1e-21
-    plot_scan(df, modes[-1], clevs, 'C0', ax2, marker='o', shift=shift, a_scale=a_scale)
-    plot_projection(a_df, [min(clevs)], ax2, color='C0', a_scale=a_scale)
-    ax2.axvline(args.tref+shift, ls=':', lw=1, color='C0')
+    plot_scan(df, modes[-1], clevs, f'tab:{acol}', ax2, marker='o', shift=shift, a_scale=a_scale)
+    plot_projection(a_df, [min(clevs)], ax2, color=f'tab:{acol}', a_scale=a_scale)
+    ax2.axvline(args.tref+shift, ls=':', lw=1, color=f'tab:{acol}')
 
     ax2.set_xlabel('$t - t_{\\mathrm{peak}}$ [$t_{M_f}$]')
     ax2.set_xticks(np.arange(-12, 15, 3))
