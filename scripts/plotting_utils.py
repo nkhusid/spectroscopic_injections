@@ -135,7 +135,7 @@ def plot_projection(a_df, cis, ax, color='gray', a_scale=1e-21):
             alpha=0.1, 
             color=color, 
             zorder=-100,
-            lw=1.5
+            lw=0
         )
 
 def plot_scan(df, mode, cis, color, ax, a_scale=1e-21, marker=None, alpha_scale=1, shift=0):
@@ -147,11 +147,13 @@ def plot_scan(df, mode, cis, color, ax, a_scale=1e-21, marker=None, alpha_scale=
         
         if i == 0:
             kws['capsize'] = 0
-            kws['lw'] = 1
+            kws['lw'] = 2
         else:
             kws['capsize'] = None
-            kws['lw'] = 2.5
+            kws['lw'] = 5
 
-        ax.errorbar(m.index+shift, m/a_scale, ((m - lohi.iloc[:,0])/a_scale, (lohi.iloc[:,1] - m)/a_scale), marker=" ", markersize=1, linestyle="", c=color, alpha=0.5*alpha_scale, **kws )
+        _, caps, bars = ax.errorbar(m.index+shift, m/a_scale, ((m - lohi.iloc[:,0])/a_scale, (lohi.iloc[:,1] - m)/a_scale), marker=" ", markersize=1, linestyle="", c=color, alpha=0.5*alpha_scale, **kws)
+        for bar in bars:
+            bar.set_capstyle('round')
         if marker is not None:
-            ax.plot(m.index +shift, m/a_scale, marker=marker,  markersize=3.5, color=color, alpha=0.95*alpha_scale, linestyle="")
+            ax.plot(m.index +shift, m/a_scale, marker=marker,  markersize=7, color=color, alpha=0.95*alpha_scale, linestyle="")
